@@ -353,7 +353,29 @@ function parseTranscriptFile(cid, filePath) {
   const outgoingMessages = []; // { stepIndex, timestamp, recipient, content, summary }
   const incomingMessages = []; // { stepIndex, timestamp, sender, content, priority }
   const definedAgents = []; // { stepIndex, timestamp, name, description, systemPrompt }
-  const userInteractions = []; // { stepIndex, timestamp, kind: 'USER_PROMPT' | 'AGENT_TO_USER', content }
+  const userInteractions = []; // { stepIndex, timestamp, kind: 'USER_PROMPT' | 'AGENT_TO_USER', content, thinking }
+  const agentThoughts = []; // { stepIndex, timestamp, thinking, tools, hasContent }
+
+  let fullThinkingMap = null;
+  const hasTruncatedThinking = steps.some((st) => Array.isArray(st.truncated_fields) && st.truncated_fields.includes('thinking'));
+  if (hasTruncatedThinking) {
+    const fullPath = path.join(path.dirname(filePath), 'transcript_full.jsonl');
+    if (fs.existsSync(fullPath)) {
+      fullThinkingMap = new Map();
+      try {
+        const fullLines = fs.readFileSync(fullPath, 'utf8').split('\n');
+        for (const fl of fullLines) {
+          if (!fl.trim()) continue;
+          try {
+            const parsedFull = JSON.parse(fl);
+            if (parsedFull.thinking) {
+              fullThinkingMap.set(parsedFull.step_index, parsedFull.thinking);
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+  }
 
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
@@ -390,13 +412,32 @@ function parseTranscriptFile(cid, filePath) {
       }
     }
 
-    if (s.type === 'PLANNER_RESPONSE' && rawContent.trim().length > 0) {
-      userInteractions.push({
-        stepIndex: s.step_index ?? i,
-        timestamp: ts,
-        kind: 'AGENT_TO_USER',
-        content: rawContent.trim()
-      });
+    if (s.type === 'PLANNER_RESPONSE') {
+      const stepIdx = s.step_index ?? i;
+      const resolvedThinking = (fullThinkingMap && fullThinkingMap.has(stepIdx))
+        ? fullThinkingMap.get(stepIdx)
+        : (typeof s.thinking === 'string' && s.thinking.trim().length > 0 ? s.thinking.trim() : null);
+      const toolsUsed = (Array.isArray(s.tool_calls) ? s.tool_calls : []).map((tc) => tc.name).filter(Boolean);
+
+      if (resolvedThinking) {
+        agentThoughts.push({
+          stepIndex: stepIdx,
+          timestamp: ts,
+          thinking: resolvedThinking,
+          tools: toolsUsed,
+          hasContent: Boolean(rawContent && rawContent.trim().length > 0)
+        });
+      }
+
+      if (rawContent.trim().length > 0) {
+        userInteractions.push({
+          stepIndex: stepIdx,
+          timestamp: ts,
+          kind: 'AGENT_TO_USER',
+          content: rawContent.trim(),
+          thinking: resolvedThinking
+        });
+      }
     }
 
     if (s.type === 'SYSTEM_MESSAGE') {
@@ -530,7 +571,8 @@ function parseTranscriptFile(cid, filePath) {
     outgoingMessages,
     incomingMessages,
     definedAgents,
-    userInteractions
+    userInteractions,
+    agentThoughts
   };
 
   transcriptCache.set(cid, { mtimeMs: stat.mtimeMs, size: stat.size, parsed });
@@ -779,6 +821,7 @@ function buildWorldState() {
           timestamp: ui.timestamp || conv.lastTimestamp,
           sender: getAgentMeta(cid),
           recipient: userMeta,
+          thinking: ui.thinking || null,
           content: ui.content
         });
       }
@@ -846,6 +889,28 @@ function buildWorldState() {
           recipient: getAgentMeta(id),
           content: inc.content || ''
         });
+      }
+    }
+
+    // 4. Agent Internal Thoughts (PLANNER_RESPONSE steps with thinking)
+    for (const id of allIdsInSession) {
+      const c = allConvMap.get(id);
+      if (!c) continue;
+      for (const th of c.agentThoughts || []) {
+        if (!th.hasContent) {
+          messages.push({
+            id: `thought:${id}:${th.stepIndex}`,
+            kind: 'AGENT_THOUGHT',
+            flowType: 'AGENT_THOUGHT',
+            stepOrder: th.stepIndex,
+            timestamp: th.timestamp || c.lastTimestamp,
+            sender: getAgentMeta(id),
+            recipient: getAgentMeta(id),
+            tools: th.tools || [],
+            thinking: th.thinking,
+            content: th.thinking
+          });
+        }
       }
     }
 
@@ -1258,6 +1323,16 @@ const FLOW_CONFIG = {
     bgLight: '#ecfdf5',
     borderLight: '#a7f3d0',
     icon: '📩'
+  },
+  AGENT_THOUGHT: {
+    flowType: 'AGENT_THOUGHT',
+    flowLabelTr: '🧠 Ajan Düşünce Süreci (Agent Thinking / Reasoning)',
+    flowShortTr: 'Ajan Düşüncesi',
+    badgeClass: 'badge-thought',
+    accentColor: '#d97706',
+    bgLight: '#fffbeb',
+    borderLight: '#fde68a',
+    icon: '🧠'
   }
 };
 
@@ -1407,9 +1482,10 @@ function filterAndPrepareExportData(session, options = {}) {
       const matchU2A = (flowFilters.includes('u2a') || flowFilters.includes('user_to_agent')) && k === 'USER_PROMPT';
       const matchA2U = (flowFilters.includes('a2u') || flowFilters.includes('agent_to_user')) && k === 'AGENT_TO_USER';
       const matchA2A = (flowFilters.includes('a2a') || flowFilters.includes('agent_to_agent')) && (k === 'TASK_DELEGATION' || k === 'AGENT_MESSAGE');
+      const matchThought = (flowFilters.includes('thought') || flowFilters.includes('thoughts') || flowFilters.includes('agent_thought')) && k === 'AGENT_THOUGHT';
       const matchKind = flowFilters.includes(k.toLowerCase()) || flowFilters.includes(ft.toLowerCase());
 
-      if (!matchU2A && !matchA2U && !matchA2A && !matchKind) {
+      if (!matchU2A && !matchA2U && !matchA2A && !matchThought && !matchKind) {
         return false;
       }
     }
@@ -1426,6 +1502,7 @@ function filterAndPrepareExportData(session, options = {}) {
     // Text search query
     if (searchQuery) {
       const contentText = (m.content || '').toLowerCase();
+      const thinkingText = (m.thinking || '').toLowerCase();
       const senderRole = (m.sender && m.sender.role ? m.sender.role : '').toLowerCase();
       const recipientRole = (m.recipient && m.recipient.role ? m.recipient.role : '').toLowerCase();
       const summaryText = (m.summary || '').toLowerCase();
@@ -1433,6 +1510,7 @@ function filterAndPrepareExportData(session, options = {}) {
 
       const matched =
         contentText.includes(searchQuery) ||
+        thinkingText.includes(searchQuery) ||
         senderRole.includes(searchQuery) ||
         recipientRole.includes(searchQuery) ||
         summaryText.includes(searchQuery) ||
@@ -1459,6 +1537,7 @@ function filterAndPrepareExportData(session, options = {}) {
   const agentToUserCount = filtered.filter((m) => m.kind === 'AGENT_TO_USER').length;
   const agentToAgentTaskCount = filtered.filter((m) => m.kind === 'TASK_DELEGATION').length;
   const agentToAgentReportCount = filtered.filter((m) => m.kind === 'AGENT_MESSAGE').length;
+  const agentThoughtCount = filtered.filter((m) => m.kind === 'AGENT_THOUGHT' || Boolean(m.thinking)).length;
 
   let firstMessageAt = null;
   let lastMessageAt = null;
@@ -1497,6 +1576,7 @@ function filterAndPrepareExportData(session, options = {}) {
       agentToUserCount,
       agentToAgentTaskCount,
       agentToAgentReportCount,
+      agentThoughtCount,
       totalExportedMessages: filtered.length,
       totalSessionMessages: allMessages.length
     },
@@ -1567,6 +1647,20 @@ function generateHtmlReport(session, prepared, options = {}) {
           </header>
 
           <div class="msg-route">
+            ${
+              m.kind === 'AGENT_THOUGHT'
+                ? `
+            <div class="route-party">
+              <span class="route-label">Düşünen Ajan:</span>
+              <span class="party-name party-agent">${escapeHtml(m.sender?.role || m.sender?.id || 'Bilinmiyor')}</span>
+              ${m.sender?.model ? `<span class="party-model">(${escapeHtml(m.sender.model)})</span>` : ''}
+            </div>
+            ${
+              m.tools && m.tools.length > 0
+                ? `<div class="route-tools font-mono text-xs">🛠️ Araçlar: <strong>${escapeHtml(m.tools.join(', '))}</strong></div>`
+                : ''
+            }`
+                : `
             <div class="route-party">
               <span class="route-label">Gönderen:</span>
               <span class="party-name ${m.sender?.isUser ? 'party-user' : 'party-agent'}">${escapeHtml(m.sender?.role || m.sender?.id || 'Bilinmiyor')}</span>
@@ -1577,10 +1671,20 @@ function generateHtmlReport(session, prepared, options = {}) {
               <span class="route-label">Alıcı:</span>
               <span class="party-name ${m.recipient?.isUser ? 'party-user' : 'party-agent'}">${escapeHtml(m.recipient?.role || m.recipient?.id || 'Bilinmiyor')}</span>
               ${m.recipient?.model ? `<span class="party-model">(${escapeHtml(m.recipient.model)})</span>` : ''}
-            </div>
+            </div>`
+            }
           </div>
 
           <div class="msg-body">
+            ${
+              m.thinking && m.kind !== 'AGENT_THOUGHT'
+                ? `
+            <details class="thought-box page-break-avoid" open>
+              <summary class="thought-header">🧠 <strong>Ajan Düşünce Süreci (Thinking)</strong></summary>
+              <div class="thought-body font-mono text-xs">${renderMarkdownToHtml(m.thinking)}</div>
+            </details>`
+                : ''
+            }
             ${formattedContent}
           </div>
         </article>`;
@@ -1861,6 +1965,50 @@ function generateHtmlReport(session, prepared, options = {}) {
     }
     .md-li { margin-left: 20px; list-style-type: disc; }
 
+    /* Thought Box (Reasoning / CoT) */
+    .thought-box {
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-left: 4px solid #d97706;
+      border-radius: 8px;
+      font-size: 0.92em;
+    }
+    body.dark-theme .thought-box {
+      background: #231c0e;
+      border-color: #593e10;
+      border-left-color: #d97706;
+    }
+    .thought-header {
+      cursor: pointer;
+      font-weight: 700;
+      color: #b45309;
+      user-select: none;
+      margin-bottom: 6px;
+    }
+    body.dark-theme .thought-header {
+      color: #fcd34d;
+    }
+    .thought-body {
+      font-family: inherit;
+      line-height: 1.55;
+    }
+    .route-tools {
+      margin-left: auto;
+      background: #fffbeb;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+    }
+    body.dark-theme .route-tools {
+      background: #231c0e;
+      color: #fcd34d;
+      border-color: #593e10;
+    }
+
     /* Code Block styling */
     .code-block-wrapper { position: relative; margin: 12px 0; }
     .code-lang {
@@ -1919,6 +2067,12 @@ function generateHtmlReport(session, prepared, options = {}) {
       .msg-card {
         margin-bottom: 12pt !important;
         border-left-width: 4pt !important;
+      }
+      .thought-box {
+        background: #fefce8 !important;
+        border: 1px solid #fde68a !important;
+        border-left: 3pt solid #d97706 !important;
+        color: #78350f !important;
       }
       .msg-header {
         background: #f8fafc !important;
@@ -2015,6 +2169,10 @@ function generateHtmlReport(session, prepared, options = {}) {
         <span class="stat-num" style="color: #059669;">${summary.agentToAgentReportCount}</span>
         <span class="stat-desc">📩 Ajan Raporu (send_message)</span>
       </div>
+      <div class="stat-card" style="border-top: 4px solid #d97706;">
+        <span class="stat-num" style="color: #d97706;">${summary.agentThoughtCount || 0}</span>
+        <span class="stat-desc">🧠 Ajan Düşüncesi (Thinking)</span>
+      </div>
     </section>
 
     <!-- Participating Agents Table -->
@@ -2099,7 +2257,7 @@ function generateMarkdownExport(session, prepared, options = {}) {
     `> **Rapor Oluşturma Tarihi:** ${nowMeta.formattedDate}  `,
     `> **Zaman Dilimi:** ${summary.firstMessageAt || '-'} — ${summary.lastMessageAt || '-'} (Toplam Süre: **${summary.totalDurationFormatted}**)  `,
     `> **Dışa Aktarılan Mesaj Sayısı:** ${summary.totalExportedMessages} / ${summary.totalSessionMessages}  `,
-    `> **İstatistikler:** 👤 Kullanıcı➔Ajan: **${summary.userToAgentCount}** | 🤖 Ajan➔Kullanıcı: **${summary.agentToUserCount}** | 🚀 Görev: **${summary.agentToAgentTaskCount}** | 📩 Rapor: **${summary.agentToAgentReportCount}**  `,
+    `> **İstatistikler:** 👤 Kullanıcı➔Ajan: **${summary.userToAgentCount}** | 🤖 Ajan➔Kullanıcı: **${summary.agentToUserCount}** | 🚀 Görev: **${summary.agentToAgentTaskCount}** | 📩 Rapor: **${summary.agentToAgentReportCount}** | 🧠 Düşünce: **${summary.agentThoughtCount || 0}**  `,
     '',
     '---',
     '',
@@ -2129,6 +2287,26 @@ function generateMarkdownExport(session, prepared, options = {}) {
     const sModel = m.sender?.model ? ` [${m.sender.model}]` : '';
     const rModel = m.recipient?.model ? ` [${m.recipient.model}]` : '';
 
+    if (m.kind === 'AGENT_THOUGHT') {
+      lines.push(`#### [#${m.seqNumber}] [${m.formattedDate}] (${m.deltaFromStart}) 🧠 ${sRole} (Düşünce Süreci / Thinking)`);
+      lines.push('');
+      lines.push(`> **Akış:** ${m.flowLabelTr}  `);
+      lines.push(`> **Tarih & Saat:** \`${m.formattedDate}\` (Başlangıçtan: \`${m.deltaFromStart}\` | Öncekinden: \`${m.deltaFromPrev}\`)  `);
+      lines.push(`> **Düşünen Ajan:** \`${sRole}${sModel}\`  `);
+      if (m.tools && m.tools.length > 0) {
+        lines.push(`> **Kullanılan / Planlanan Araçlar:** \`${m.tools.join(', ')}\`  `);
+      }
+      lines.push('');
+      lines.push('> 💭 **Muhakeme & Planlama (Thinking):**');
+      lines.push('>');
+      const thoughtLines = (m.thinking || m.content || '').trim().split('\n');
+      for (const tl of thoughtLines) {
+        lines.push(`> ${tl}`);
+      }
+      lines.push('', '---', '');
+      continue;
+    }
+
     lines.push(`#### [#${m.seqNumber}] [${m.formattedDate}] (${m.deltaFromStart}) ${m.icon} ${sRole} ➔ ${rRole}`);
     lines.push('');
     lines.push(`> **Akış:** ${m.flowLabelTr}  `);
@@ -2136,6 +2314,14 @@ function generateMarkdownExport(session, prepared, options = {}) {
     lines.push(`> **Yön:** \`${sRole}${sModel}\` ➔ \`${rRole}${rModel}\`  `);
     if (m.model && m.kind === 'TASK_DELEGATION') {
       lines.push(`> **Hedef Model:** \`${m.model}\` | **Workspace:** \`${m.workspace || 'inherit'}\`  `);
+    }
+    if (m.thinking) {
+      lines.push('');
+      lines.push('> 💭 **Ajan Düşünce Süreci (Thinking):**');
+      lines.push('>');
+      for (const tl of m.thinking.trim().split('\n')) {
+        lines.push(`> ${tl}`);
+      }
     }
     lines.push('');
 
@@ -2177,6 +2363,7 @@ function generateTextExport(session, prepared, options = {}) {
     `  - 🤖 Ajan -> Kullanici (Agent to User)        : ${summary.agentToUserCount}`,
     `  - 🚀 Ajan -> Ajan Gorev (TASK_DELEGATION)     : ${summary.agentToAgentTaskCount}`,
     `  - 📩 Ajan -> Ajan Rapor (AGENT_MESSAGE)       : ${summary.agentToAgentReportCount}`,
+    `  - 🧠 Ajan Dusunceleri (Agent Thinking)        : ${summary.agentThoughtCount || 0}`,
     sepSingle,
     'KATILIMCI AJANLAR:',
     ...agents.map(
@@ -2198,11 +2385,26 @@ function generateTextExport(session, prepared, options = {}) {
     lines.push(
       `[#${m.seqNumber}] ${m.formattedDate} | Baslangictan: ${m.deltaFromStart} | Oncekinden: ${m.deltaFromPrev}`
     );
+
+    if (m.kind === 'AGENT_THOUGHT') {
+      lines.push(`AKIS     : ${m.flowLabelTr}`);
+      lines.push(`AJAN     : ${sRole}${sModel}`);
+      if (m.tools && m.tools.length > 0) {
+        lines.push(`ARACLAR  : ${m.tools.join(', ')}`);
+      }
+      lines.push(sepSingle);
+      lines.push(m.thinking || m.content || '');
+      continue;
+    }
+
     lines.push(`AKIS     : ${m.flowLabelTr}`);
     lines.push(`GONDEREN : ${sRole}${sModel}`);
     lines.push(`ALICI    : ${rRole}${rModel}`);
     if (m.model && m.kind === 'TASK_DELEGATION') {
       lines.push(`MODEL    : ${m.model} (Workspace: ${m.workspace || 'inherit'})`);
+    }
+    if (m.thinking) {
+      lines.push(`DUSUNCE  : ${m.thinking.split('\n')[0].slice(0, 100)}...`);
     }
     lines.push(sepSingle);
     lines.push(m.content || '');
@@ -2277,6 +2479,8 @@ function generateJsonExport(session, prepared, options = {}) {
       model: m.model || null,
       workspace: m.workspace || null,
       summary: m.summary || null,
+      tools: m.tools || [],
+      thinking: m.thinking || null,
       content: m.content || ''
     }))
   };

@@ -526,6 +526,9 @@
               <button id="flowBtnAGENT_TO_AGENT" onclick="setReaderFlowFilter('AGENT_TO_AGENT')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white">
                 🤖➔🤖 Agent to Agent (<span id="flowCountAGENT_TO_AGENT">0</span>)
               </button>
+              <button id="flowBtnAGENT_THOUGHT" onclick="setReaderFlowFilter('AGENT_THOUGHT')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                🧠 Düşünceler (<span id="flowCountAGENT_THOUGHT">0</span>)
+              </button>
             </div>
 
             <!-- Agent Dropdown Selector -->
@@ -707,7 +710,7 @@
         <!-- Flow Selection -->
         <div class="space-y-2">
           <label class="block font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Dahil Edilecek Akışlar</label>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
               <input type="checkbox" id="exportFlowUserPrompt" onchange="updateExportPreview()" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
               <div>
@@ -729,6 +732,14 @@
               <div>
                 <div class="font-semibold text-emerald-300">🤖➔🤖 Agent to Agent</div>
                 <div class="text-[10px] text-slate-400">Görev ataması & Alt ajan raporları</div>
+              </div>
+            </label>
+
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <input type="checkbox" id="exportFlowAgentThought" onchange="updateExportPreview()" checked class="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0" />
+              <div>
+                <div class="font-semibold text-amber-300">🧠 Ajan Düşünceleri</div>
+                <div class="text-[10px] text-slate-400">İç muhakeme &amp; planlama (Thinking)</div>
               </div>
             </label>
           </div>
@@ -1881,6 +1892,13 @@
           borderCls: 'border-indigo-500/40 bg-indigo-950/20'
         };
       }
+      if (m.kind === 'AGENT_THOUGHT') {
+        return {
+          tag: '🧠 AJAN DÜŞÜNCE SÜRECİ (THINKING)',
+          tagCls: 'text-amber-300 bg-amber-500/20 border border-amber-500/40',
+          borderCls: 'border-amber-500/40 bg-amber-950/20'
+        };
+      }
       return {
         tag: '📩 ALT AJAN RAPORU / MESAJI (send_message)',
         tagCls: 'text-emerald-300 bg-emerald-500/20 border border-emerald-500/40',
@@ -2726,11 +2744,13 @@
 
     function setReaderFlowFilter(flow) {
       readerFlowFilter = flow;
-      ['ALL', 'USER_TO_AGENT', 'AGENT_TO_USER', 'AGENT_TO_AGENT'].forEach((f) => {
+      ['ALL', 'USER_TO_AGENT', 'AGENT_TO_USER', 'AGENT_TO_AGENT', 'AGENT_THOUGHT'].forEach((f) => {
         const btn = document.getElementById(`flowBtn${f}`);
         if (!btn) return;
         if (f === flow) {
-          btn.className = 'px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white';
+          btn.className = f === 'AGENT_THOUGHT'
+            ? 'px-2.5 py-1 rounded-lg font-medium transition bg-amber-600 text-white shadow-sm'
+            : 'px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white shadow-sm';
         } else {
           btn.className = 'px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white';
         }
@@ -2858,11 +2878,14 @@
       const countU2A = allMsgs.filter((m) => m.kind === 'USER_PROMPT').length;
       const countA2U = allMsgs.filter((m) => m.kind === 'AGENT_TO_USER').length;
       const countA2A = allMsgs.filter((m) => m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE').length;
+      const countThought = allMsgs.filter((m) => m.kind === 'AGENT_THOUGHT' || Boolean(m.thinking)).length;
 
       document.getElementById('flowCountALL').textContent = allMsgs.length;
       document.getElementById('flowCountUSER_TO_AGENT').textContent = countU2A;
       document.getElementById('flowCountAGENT_TO_USER').textContent = countA2U;
       document.getElementById('flowCountAGENT_TO_AGENT').textContent = countA2A;
+      const thoughtCountEl = document.getElementById('flowCountAGENT_THOUGHT');
+      if (thoughtCountEl) thoughtCountEl.textContent = countThought;
 
       let filtered = allMsgs.map((m, origIdx) => ({ ...m, _origIdx: origIdx }));
 
@@ -2872,6 +2895,8 @@
         filtered = filtered.filter((m) => m.kind === 'AGENT_TO_USER');
       } else if (readerFlowFilter === 'AGENT_TO_AGENT') {
         filtered = filtered.filter((m) => m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE');
+      } else if (readerFlowFilter === 'AGENT_THOUGHT') {
+        filtered = filtered.filter((m) => m.kind === 'AGENT_THOUGHT');
       }
 
       if (readerAgentFilter !== 'ALL') {
@@ -2881,6 +2906,7 @@
       if (readerSearchQuery) {
         filtered = filtered.filter((m) =>
           (m.content || '').toLowerCase().includes(readerSearchQuery) ||
+          (m.thinking || '').toLowerCase().includes(readerSearchQuery) ||
           (m.sender.role || '').toLowerCase().includes(readerSearchQuery) ||
           (m.recipient.role || '').toLowerCase().includes(readerSearchQuery)
         );
@@ -2988,11 +3014,20 @@
                 <span class="mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">#${seqNumber}</span>
                 <span class="text-[10px] font-bold px-2.5 py-0.5 rounded ${meta.tagCls}">${meta.tag}</span>
 
-                <div class="flex items-center gap-1.5 text-xs font-semibold">
-                  <span class="text-white px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.sender.role)}</span>
-                  <span class="text-slate-400 font-bold">➔</span>
-                  <span class="text-cyan-300 px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.recipient.role)}</span>
-                </div>
+                ${
+                  m.kind === 'AGENT_THOUGHT'
+                    ? `
+                    <div class="flex items-center gap-1.5 text-xs font-semibold">
+                      <span class="text-white px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.sender.role)}</span>
+                      ${m.tools && m.tools.length > 0 ? `<span class="mono text-[10px] px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-500/30">🛠️ ${escapeHtml(m.tools.join(', '))}</span>` : ''}
+                    </div>`
+                    : `
+                    <div class="flex items-center gap-1.5 text-xs font-semibold">
+                      <span class="text-white px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.sender.role)}</span>
+                      <span class="text-slate-400 font-bold">➔</span>
+                      <span class="text-cyan-300 px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.recipient.role)}</span>
+                    </div>`
+                }
 
                 ${m.kind === 'TASK_DELEGATION' ? getModelBadgeHtml(m.model) : ''}
               </div>
@@ -3020,6 +3055,20 @@
 
             <!-- Readable Message Body -->
             <div class="readable-prose ${fontClass} text-slate-100 overflow-x-auto whitespace-pre-wrap">
+              ${
+                m.thinking && m.kind !== 'AGENT_THOUGHT'
+                  ? `
+              <details class="mb-3 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs" open>
+                <summary class="cursor-pointer font-bold text-amber-300 select-none flex items-center gap-1.5">
+                  <span>🧠</span>
+                  <span>Ajan Düşünce Süreci (Thinking)</span>
+                </summary>
+                <div class="mt-2 text-slate-300 text-[11px] font-mono leading-relaxed whitespace-pre-wrap border-t border-amber-500/20 pt-2">
+                  ${renderReadableMarkdown(m.thinking)}
+                </div>
+              </details>`
+                  : ''
+              }
               ${renderedHtml}
             </div>
           </div>
@@ -3049,12 +3098,14 @@
       const incUser = document.getElementById('exportFlowUserPrompt').checked;
       const incAgentUser = document.getElementById('exportFlowAgentUser').checked;
       const incAgentAgent = document.getElementById('exportFlowAgentAgent').checked;
+      const incThought = document.getElementById('exportFlowAgentThought').checked;
       const agentId = document.getElementById('exportAgentSelect').value;
 
       const matched = allMsgs.filter((m) => {
         if (m.kind === 'USER_PROMPT' && !incUser) return false;
         if (m.kind === 'AGENT_TO_USER' && !incAgentUser) return false;
         if ((m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE') && !incAgentAgent) return false;
+        if (m.kind === 'AGENT_THOUGHT' && !incThought) return false;
         if (agentId !== 'ALL' && m.sender.id !== agentId && m.recipient.id !== agentId) return false;
         return true;
       });
@@ -3090,7 +3141,15 @@
         out += `================================================================================\n\n`;
 
         sorted.forEach((m, idx) => {
+          if (m.kind === 'AGENT_THOUGHT') {
+            out += `[#${idx + 1}] ${formatFullDateTime(m.timestamp)} | 🧠 ${m.sender.role} (AGENT_THOUGHT)\n`;
+            if (m.tools && m.tools.length > 0) out += `ARACLAR: ${m.tools.join(', ')}\n`;
+            out += `DUSUNCE (THINKING):\n${m.thinking || m.content || ''}\n`;
+            out += `--------------------------------------------------------------------------------\n\n`;
+            return;
+          }
           out += `[#${idx + 1}] ${formatFullDateTime(m.timestamp)} | ${m.sender.role} -> ${m.recipient.role} (${m.kind})\n`;
+          if (m.thinking) out += `DUSUNCE (THINKING):\n${m.thinking}\n\n`;
           out += `${m.content || ''}\n`;
           out += `--------------------------------------------------------------------------------\n\n`;
         });
@@ -3106,21 +3165,36 @@
         out += `## 💬 Mesaj Akışı (${order === 'asc' ? 'Kronolojik 1 ➔ N' : 'En Yeni Üstte'})\n\n`;
 
         sorted.forEach((m, idx) => {
+          if (m.kind === 'AGENT_THOUGHT') {
+            out += `### #${idx + 1} - 🧠 ${m.sender.role} (Düşünce Süreci / Thinking)\n`;
+            out += `- **Tür**: \`AGENT_THOUGHT\`\n`;
+            out += `- **Tarih**: ${formatFullDateTime(m.timestamp)}\n`;
+            if (m.tools && m.tools.length > 0) out += `- **Araçlar**: \`${m.tools.join(', ')}\`\n`;
+            out += `\n> 💭 **Muhakeme (Thinking):**\n> ${(m.thinking || m.content || '').split('\n').join('\n> ')}\n\n---\n\n`;
+            return;
+          }
           out += `### #${idx + 1} - ${m.sender.role} ➔ ${m.recipient.role}\n`;
           out += `- **Tür**: \`${m.kind}\`\n`;
           out += `- **Tarih**: ${formatFullDateTime(m.timestamp)}\n`;
           if (m.model) out += `- **Model**: \`${m.model}\`\n`;
+          if (m.thinking) {
+            out += `\n> 💭 **Ajan Düşünce Süreci (Thinking):**\n> ${m.thinking.split('\n').join('\n> ')}\n`;
+          }
           out += `\n${m.content || ''}\n\n---\n\n`;
         });
         return out;
       }
 
       let html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>${escapeHtml(session.title)} - Export</title>`;
-      html += `<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;color:#1e293b;padding:2rem;max-width:900px;margin:auto;} h1{border-bottom:2px solid #e2e8f0;padding-bottom:8px;} .card{border:1px solid #cbd5e1;border-radius:8px;padding:16px;margin-bottom:16px;page-break-inside:avoid;} .header{display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:12px;font-size:12px;color:#64748b;} pre{background:#f8fafc;padding:12px;border-radius:6px;overflow-x:auto;font-family:monospace;white-space:pre-wrap;border:1px solid #e2e8f0;}</style></head><body>`;
+      html += `<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;color:#1e293b;padding:2rem;max-width:900px;margin:auto;} h1{border-bottom:2px solid #e2e8f0;padding-bottom:8px;} .card{border:1px solid #cbd5e1;border-radius:8px;padding:16px;margin-bottom:16px;page-break-inside:avoid;} .card-thought{border-left:4px solid #d97706;background:#fffbeb;} .header{display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:12px;font-size:12px;color:#64748b;} pre{background:#f8fafc;padding:12px;border-radius:6px;overflow-x:auto;font-family:monospace;white-space:pre-wrap;border:1px solid #e2e8f0;}</style></head><body>`;
       html += `<h1>📖 ${escapeHtml(session.title)}</h1>`;
       html += `<p><strong>Proje:</strong> ${escapeHtml(session.project)} | <strong>ID:</strong> ${escapeHtml(session.id)} | <strong>Tarih:</strong> ${formatFullDateTime(new Date().toISOString())}</p>`;
       sorted.forEach((m, idx) => {
-        html += `<div class="card"><div class="header"><span><strong>#${idx + 1}</strong> ${escapeHtml(m.sender.role)} ➔ ${escapeHtml(m.recipient.role)} [${escapeHtml(m.kind)}]</span><span>${formatFullDateTime(m.timestamp)}</span></div><pre>${escapeHtml(m.content || '')}</pre></div>`;
+        if (m.kind === 'AGENT_THOUGHT') {
+          html += `<div class="card card-thought"><div class="header"><span><strong>#${idx + 1}</strong> 🧠 ${escapeHtml(m.sender.role)} [AGENT_THOUGHT]</span><span>${formatFullDateTime(m.timestamp)}</span></div>${m.tools && m.tools.length > 0 ? `<div style="font-size:11px;margin-bottom:8px;">🛠️ Araçlar: <code>${escapeHtml(m.tools.join(', '))}</code></div>` : ''}<pre style="background:#fef3c7;border-color:#fde68a;">${escapeHtml(m.thinking || m.content || '')}</pre></div>`;
+          return;
+        }
+        html += `<div class="card"><div class="header"><span><strong>#${idx + 1}</strong> ${escapeHtml(m.sender.role)} ➔ ${escapeHtml(m.recipient.role)} [${escapeHtml(m.kind)}]</span><span>${formatFullDateTime(m.timestamp)}</span></div>${m.thinking ? `<details style="margin-bottom:10px;background:#fffbeb;padding:8px 12px;border-radius:6px;border:1px solid #fde68a;"><summary style="font-weight:700;color:#b45309;cursor:pointer;">🧠 Düşünce Süreci</summary><pre style="background:transparent;border:none;margin-top:6px;font-size:11px;">${escapeHtml(m.thinking)}</pre></details>` : ''}<pre>${escapeHtml(m.content || '')}</pre></div>`;
       });
       html += `</body></html>`;
       return html;
@@ -3133,6 +3207,7 @@
       const incUser = document.getElementById('exportFlowUserPrompt').checked;
       const incAgentUser = document.getElementById('exportFlowAgentUser').checked;
       const incAgentAgent = document.getElementById('exportFlowAgentAgent').checked;
+      const incThought = document.getElementById('exportFlowAgentThought').checked;
       const agentId = document.getElementById('exportAgentSelect').value;
       const order = document.getElementById('exportOrderSelect').value;
       const format = document.querySelector('input[name="exportFormatRadio"]:checked')?.value || 'html';
@@ -3141,6 +3216,7 @@
       if (incUser) flows.push('USER_PROMPT');
       if (incAgentUser) flows.push('AGENT_TO_USER');
       if (incAgentAgent) { flows.push('TASK_DELEGATION'); flows.push('AGENT_MESSAGE'); }
+      if (incThought) flows.push('AGENT_THOUGHT');
 
       const allMsgs = s.messages || [];
       const matched = allMsgs.filter((m) => {
@@ -3172,6 +3248,7 @@
       if (readerFlowFilter === 'USER_TO_AGENT') flowsParam = 'u2a';
       else if (readerFlowFilter === 'AGENT_TO_USER') flowsParam = 'a2u';
       else if (readerFlowFilter === 'AGENT_TO_AGENT') flowsParam = 'a2a';
+      else if (readerFlowFilter === 'AGENT_THOUGHT') flowsParam = 'agent_thought';
 
       const agentParam = readerAgentFilter !== 'ALL' ? `&agentId=${encodeURIComponent(readerAgentFilter)}` : '';
       const searchParam = readerSearchQuery ? `&search=${encodeURIComponent(readerSearchQuery)}` : '';
