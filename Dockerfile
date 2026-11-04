@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package.json ./
 COPY server.js ./
+COPY exporter.js ./
 COPY sync_from_agy.py ./
 COPY public ./public
 

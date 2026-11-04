@@ -52,6 +52,138 @@
         radial-gradient(circle at 1px 1px, rgba(99, 102, 241, 0.16) 1px, transparent 0);
       background-size: 28px 28px;
     }
+
+    /* Reader Font Sizes */
+    .reader-font-sm { font-size: 0.8125rem; line-height: 1.5; }
+    .reader-font-md { font-size: 0.9375rem; line-height: 1.65; }
+    .reader-font-lg { font-size: 1.0625rem; line-height: 1.75; }
+    .reader-font-xl { font-size: 1.1875rem; line-height: 1.85; }
+
+    /* Reader Theme Modes */
+    .reader-paper {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+    }
+    .reader-paper .reader-card {
+      background-color: #ffffff !important;
+      border-color: #e2e8f0 !important;
+      color: #0f172a !important;
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
+    }
+    .reader-paper .reader-card pre {
+      background-color: #f8fafc !important;
+      color: #0f172a !important;
+      border-color: #e2e8f0 !important;
+    }
+    .reader-paper .reader-banner {
+      background-color: #ffffff !important;
+      border-color: #cbd5e1 !important;
+      color: #0f172a !important;
+      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
+    }
+    .reader-paper .reader-subtext {
+      color: #475569 !important;
+    }
+    .reader-paper .reader-divider {
+      background-color: #e2e8f0 !important;
+      color: #64748b !important;
+    }
+
+    /* Rich Readable Markdown Prose */
+    .readable-prose code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .readable-prose p {
+      margin-bottom: 0.65rem;
+    }
+    .readable-prose p:last-child {
+      margin-bottom: 0;
+    }
+    .readable-prose h1, .readable-prose h2, .readable-prose h3 {
+      font-weight: 700;
+      margin-top: 1.1rem;
+      margin-bottom: 0.5rem;
+    }
+    .readable-prose h1 { font-size: 1.35em; border-bottom: 1px solid rgba(148, 163, 184, 0.25); padding-bottom: 0.35rem; }
+    .readable-prose h2 { font-size: 1.2em; border-bottom: 1px solid rgba(148, 163, 184, 0.15); padding-bottom: 0.25rem; }
+    .readable-prose h3 { font-size: 1.05em; }
+    .readable-prose ul { list-style-type: disc; padding-left: 1.35rem; margin-bottom: 0.65rem; }
+    .readable-prose ol { list-style-type: decimal; padding-left: 1.35rem; margin-bottom: 0.65rem; }
+    .readable-prose li { margin-bottom: 0.25rem; }
+    .readable-prose blockquote {
+      border-left: 4px solid #6366f1;
+      padding-left: 0.9rem;
+      margin: 0.75rem 0;
+      color: #94a3b8;
+      font-style: italic;
+    }
+    .reader-paper .readable-prose blockquote {
+      border-left-color: #4f46e5 !important;
+      color: #475569 !important;
+    }
+
+    /* Print media stylesheet */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #111827 !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      header, aside, #sessionHeader, #profilesModal, #exportModal, .no-print,
+      #tabGraph, #tabOverview, #tabInspector, #readerControlToolbar, #replayBanner {
+        display: none !important;
+      }
+      main {
+        background: transparent !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      #tabReader {
+        display: block !important;
+        height: auto !important;
+        overflow: visible !important;
+        background: transparent !important;
+      }
+      #readerScrollContainer {
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: transparent !important;
+      }
+      #readerMessagesContainer {
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+      .reader-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 1px solid #d1d5db !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+        box-shadow: none !important;
+        margin-bottom: 1.25rem !important;
+      }
+      .reader-card pre, .reader-card code {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border: 1px solid #e5e7eb !important;
+        white-space: pre-wrap !important;
+      }
+      .readable-prose, .readable-prose * {
+        color: #111827 !important;
+      }
+      .reader-banner {
+        border: 1px solid #d1d5db !important;
+        background: #f9fafb !important;
+        color: #111827 !important;
+      }
+      .print-copy-btn, .print-hide {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body class="h-screen overflow-hidden flex flex-col select-none">
@@ -150,7 +282,7 @@
           <h2 id="activeSessionTitle" class="text-sm font-semibold text-white truncate mt-1">Bir oturum seçin</h2>
         </div>
 
-        <!-- View Mode Tabs + Active Only Switch -->
+        <!-- View Mode Tabs + Active Only Switch + Quick Export Button -->
         <div class="flex flex-wrap items-center gap-2 shrink-0">
           <!-- Toggle Switch: Sadece Çalışan Aktif Ajanları Göster -->
           <button
@@ -166,15 +298,30 @@
             <span id="runningAgentCountPill" class="mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400">0</span>
           </button>
 
+          <!-- Quick Export / Yazdır Modal Button -->
+          <button
+            onclick="openExportModal()"
+            class="px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold transition flex items-center gap-1.5 shadow-sm"
+            title="Mesajları farklı formatlarda dışa aktar veya yazdır"
+          >
+            <span>📥</span>
+            <span>Export / Yazdır</span>
+          </button>
+
           <div class="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs shrink-0 gap-1">
-            <button id="tabBtnGraph" onclick="setMainTab('graph')" class="px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition">
+            <button id="tabBtnGraph" onclick="setMainTab('graph')" class="px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition flex items-center gap-1.5">
               🕸️ İnteraktif Ajan Graph'ı
             </button>
-            <button id="tabBtnOverview" onclick="setMainTab('overview')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">
+            <button id="tabBtnOverview" onclick="setMainTab('overview')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1.5">
               💬 Kartlar & Mesaj Akışı
             </button>
-            <button id="tabBtnInspector" onclick="setMainTab('inspector')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">
+            <button id="tabBtnInspector" onclick="setMainTab('inspector')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1.5">
               🔍 Adım & Düşünce (Thinking)
+            </button>
+            <button id="tabBtnReader" onclick="setMainTab('reader')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1.5">
+              <span>📖</span>
+              <span>Rahat Okuma & Export</span>
+              <span id="readerTabCountBadge" class="mono text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300">0</span>
             </button>
           </div>
         </div>
@@ -356,6 +503,173 @@
         </div>
       </div>
 
+      <!-- ===================================================================== -->
+      <!-- TAB 3: DEDICATED COMFORTABLE READER MODE & CHRONOLOGICAL EXPORT       -->
+      <!-- ===================================================================== -->
+      <div id="tabReader" class="hidden flex-1 flex flex-col overflow-hidden bg-slate-950/20">
+
+        <!-- Reader Control & Filter Bar (Sticky Header) -->
+        <div id="readerControlToolbar" class="no-print p-3 border-b border-slate-800/90 bg-slate-950/90 backdrop-blur space-y-2.5 shrink-0 z-10 shadow-lg">
+          <!-- Row 1: Flow Filter Pills + Agent Selector + Chronological Direction Toggle -->
+          <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <!-- Flow Filters (User->Agent, Agent->User, Agent->Agent) -->
+            <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+              <button id="flowBtnALL" onclick="setReaderFlowFilter('ALL')" class="px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white">
+                Tümü (<span id="flowCountALL">0</span>)
+              </button>
+              <button id="flowBtnUSER_TO_AGENT" onclick="setReaderFlowFilter('USER_TO_AGENT')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                👤➔🤖 User to Agent (<span id="flowCountUSER_TO_AGENT">0</span>)
+              </button>
+              <button id="flowBtnAGENT_TO_USER" onclick="setReaderFlowFilter('AGENT_TO_USER')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                🤖➔👤 Agent to User (<span id="flowCountAGENT_TO_USER">0</span>)
+              </button>
+              <button id="flowBtnAGENT_TO_AGENT" onclick="setReaderFlowFilter('AGENT_TO_AGENT')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white">
+                🤖➔🤖 Agent to Agent (<span id="flowCountAGENT_TO_AGENT">0</span>)
+              </button>
+            </div>
+
+            <!-- Agent Dropdown Selector -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400">Ajan:</span>
+              <select id="readerAgentSelect" onchange="onReaderAgentChange(this.value)" class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+                <option value="ALL">👥 Tüm Ajanlar</option>
+              </select>
+            </div>
+
+            <!-- Chronological Order Integrity Toggle (Default: Chronologic #1 -> #N) -->
+            <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs">
+              <button id="orderBtnAsc" onclick="setReaderOrder('asc')" class="px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white flex items-center gap-1" title="Eskiden yeniye sıralama - Baştan sona bir hikaye gibi oku">
+                <span>⏳</span>
+                <span>Kronolojik (1 ➔ N Bütünlük)</span>
+              </button>
+              <button id="orderBtnDesc" onclick="setReaderOrder('desc')" class="px-2.5 py-1 rounded-lg font-medium transition text-slate-400 hover:text-white flex items-center gap-1" title="En yeni mesaj en üstte">
+                <span>⚡</span>
+                <span>En Yeni Üstte (N ➔ 1)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Row 2: Reading Comfort (Font, Width, Theme, Expand All) + Search + Quick Direct Export Buttons -->
+          <div class="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-800/60">
+            <!-- Left Comfort Settings -->
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- Font Size -->
+              <div class="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 text-xs">
+                <span class="text-[11px] text-slate-400 mr-1">Yazı:</span>
+                <button id="fontSizeBtn-sm" onclick="setReaderFontSize('sm')" class="px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-white">S</button>
+                <button id="fontSizeBtn-md" onclick="setReaderFontSize('md')" class="px-1.5 py-0.5 rounded text-[11px] font-mono bg-indigo-600 text-white font-bold">M</button>
+                <button id="fontSizeBtn-lg" onclick="setReaderFontSize('lg')" class="px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-white">L</button>
+                <button id="fontSizeBtn-xl" onclick="setReaderFontSize('xl')" class="px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-white">XL</button>
+              </div>
+
+              <!-- Book Width vs Full Width -->
+              <button
+                id="readerBookWidthBtn"
+                onclick="toggleReaderBookWidth()"
+                class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 transition flex items-center gap-1"
+                title="Odaklanmış Kitap Genişliği (880px) veya Tam Ekran Genişlik"
+              >
+                <span id="readerBookWidthIcon">📖</span>
+                <span id="readerBookWidthLabel">Kitap Genişliği</span>
+              </button>
+
+              <!-- Paper Theme vs Dark Theme -->
+              <button
+                id="readerThemeBtn"
+                onclick="toggleReaderTheme()"
+                class="px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 transition flex items-center gap-1"
+                title="Gündüz/Baskı kağıt teması ile gece karanlık tema arasında geçiş"
+              >
+                <span id="readerThemeIcon">☀️</span>
+                <span id="readerThemeLabel">Açık Kağıt Teması</span>
+              </button>
+
+              <!-- Expand/Collapse All Long Messages -->
+              <button
+                id="readerExpandAllBtn"
+                onclick="toggleReaderExpandAll()"
+                class="px-2.5 py-1 rounded-lg border border-indigo-500/40 bg-indigo-950/40 text-xs text-indigo-300 transition flex items-center gap-1"
+                title="Tüm mesajların tam içeriğini kesintisiz göster"
+              >
+                <span>📂</span>
+                <span id="readerExpandAllLabel">Tam Metinler Açık</span>
+              </button>
+            </div>
+
+            <!-- Center Search -->
+            <div class="flex-1 max-w-xs min-w-[180px]">
+              <input
+                type="text"
+                id="readerSearchInput"
+                oninput="onReaderSearch(this.value)"
+                placeholder="Mesajlarda ve ajanlarda ara..."
+                class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <!-- Right Direct Export / Print Buttons -->
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button
+                onclick="directPrintOrExport('print')"
+                class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center gap-1 shadow-sm"
+                title="Yazdır / PDF Olarak Kaydet"
+              >
+                <span>🖨️</span>
+                <span>Yazdır / PDF</span>
+              </button>
+
+              <button
+                onclick="directPrintOrExport('html')"
+                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-1"
+                title="Yeni Sekmede Bağımsız HTML Raporu Aç"
+              >
+                <span>🌐</span>
+                <span>HTML</span>
+              </button>
+
+              <button
+                onclick="directPrintOrExport('md')"
+                class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-1"
+                title="Markdown (.md) Raporu Olarak İndir"
+              >
+                <span>📝</span>
+                <span>Markdown</span>
+              </button>
+
+              <button
+                onclick="directPrintOrExport('txt')"
+                class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition"
+                title="Düz Metin (.txt) Olarak İndir"
+              >
+                <span>.txt</span>
+              </button>
+
+              <button
+                onclick="directPrintOrExport('json')"
+                class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition"
+                title="JSON (.json) Olarak İndir"
+              >
+                <span>.json</span>
+              </button>
+
+              <button
+                onclick="openExportModal()"
+                class="px-2 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-medium transition"
+                title="Detaylı Dışa Aktarma Penceresi"
+              >
+                <span>⚙️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reader Scroll Container -->
+        <div id="readerScrollContainer" class="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
+          <div id="readerMessagesContainer" class="w-full max-w-4xl space-y-4"></div>
+        </div>
+
+      </div>
+
     </main>
   </div>
 
@@ -370,6 +684,152 @@
         <button onclick="closeProfilesModal()" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
       </div>
       <div id="profilesModalBody" class="p-5 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPORT & PRINT CONFIGURATION -->
+  <div id="exportModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden select-text">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">📥</span>
+          <div>
+            <h3 class="text-base font-bold text-white">Mesaj Akışı Dışa Aktar & Yazdır</h3>
+            <p class="text-xs text-slate-400">Oturum konuşmalarını tarih bütünlüğüyle ve istediğiniz formatta dışa aktarın</p>
+          </div>
+        </div>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-white text-xl px-2">✕</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-5 text-xs text-slate-200">
+        <!-- Flow Selection -->
+        <div class="space-y-2">
+          <label class="block font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Dahil Edilecek Akışlar</label>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <input type="checkbox" id="exportFlowUserPrompt" onchange="updateExportPreview()" checked class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0" />
+              <div>
+                <div class="font-semibold text-sky-300">👤➔🤖 User to Agent</div>
+                <div class="text-[10px] text-slate-400">Kullanıcı istekleri (Prompt)</div>
+              </div>
+            </label>
+
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <input type="checkbox" id="exportFlowAgentUser" onchange="updateExportPreview()" checked class="rounded bg-slate-900 border-slate-700 text-purple-500 focus:ring-0" />
+              <div>
+                <div class="font-semibold text-purple-300">🤖➔👤 Agent to User</div>
+                <div class="text-[10px] text-slate-400">Kullanıcıya verilen yanıtlar</div>
+              </div>
+            </label>
+
+            <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <input type="checkbox" id="exportFlowAgentAgent" onchange="updateExportPreview()" checked class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+              <div>
+                <div class="font-semibold text-emerald-300">🤖➔🤖 Agent to Agent</div>
+                <div class="text-[10px] text-slate-400">Görev ataması & Alt ajan raporları</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Agent Filter + Sort Order -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-1.5">Ajan Filtresi</label>
+            <select id="exportAgentSelect" onchange="updateExportPreview()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+              <option value="ALL">👥 Tüm Ajanlar (Tüm Oturum Akışı)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-300 uppercase tracking-wider text-[11px] mb-1.5">Zaman Sıralaması</label>
+            <select id="exportOrderSelect" onchange="updateExportPreview()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+              <option value="asc">⏳ Kronolojik (Eskiden Yeniye #1 ➔ #N - Hikaye/Bütünlük Modu)</option>
+              <option value="desc">⚡ En Yeni Üstte (#N ➔ #1 - Ters Kronolojik)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Format Selection -->
+        <div class="space-y-2">
+          <label class="block font-semibold text-slate-300 uppercase tracking-wider text-[11px]">Dışa Aktarma Formatı</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <label class="flex flex-col p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <div class="flex items-center gap-2 mb-1">
+                <input type="radio" name="exportFormatRadio" value="html" checked onchange="updateExportPreview()" class="text-indigo-600 focus:ring-0" />
+                <span class="font-bold text-white">🖨️ HTML / PDF</span>
+              </div>
+              <span class="text-[10px] text-slate-400">Yazdırılabilir temiz rapor</span>
+            </label>
+
+            <label class="flex flex-col p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <div class="flex items-center gap-2 mb-1">
+                <input type="radio" name="exportFormatRadio" value="md" onchange="updateExportPreview()" class="text-indigo-600 focus:ring-0" />
+                <span class="font-bold text-white">📝 Markdown</span>
+              </div>
+              <span class="text-[10px] text-slate-400">.md formatında doküman</span>
+            </label>
+
+            <label class="flex flex-col p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <div class="flex items-center gap-2 mb-1">
+                <input type="radio" name="exportFormatRadio" value="txt" onchange="updateExportPreview()" class="text-indigo-600 focus:ring-0" />
+                <span class="font-bold text-white">📄 Metin (.txt)</span>
+              </div>
+              <span class="text-[10px] text-slate-400">Sadeleştirilmiş metin akışı</span>
+            </label>
+
+            <label class="flex flex-col p-3 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/50 cursor-pointer">
+              <div class="flex items-center gap-2 mb-1">
+                <input type="radio" name="exportFormatRadio" value="json" onchange="updateExportPreview()" class="text-indigo-600 focus:ring-0" />
+                <span class="font-bold text-white">📦 JSON</span>
+              </div>
+              <span class="text-[10px] text-slate-400">Ham veri ve meta bilgiler</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Preview Info Box -->
+        <div class="p-3.5 rounded-xl border border-indigo-500/30 bg-indigo-950/20 flex items-center justify-between gap-3">
+          <div>
+            <div class="font-semibold text-indigo-300">Seçilen Filtreye Uygun Mesaj Sayısı</div>
+            <div id="exportMatchSummary" class="text-[11px] text-slate-400">Hesaplanıyor...</div>
+          </div>
+          <div id="exportMatchCountBadge" class="mono text-base font-bold px-3 py-1 rounded-lg bg-indigo-600/30 text-indigo-200 border border-indigo-500/40">
+            0 mesaj
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer Action Buttons -->
+      <div class="px-6 py-4 border-t border-slate-800 bg-slate-950/70 flex flex-wrap items-center justify-between gap-3">
+        <button onclick="closeExportModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+          Vazgeç
+        </button>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="executeExportAction('clipboard')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5">
+            <span>📋</span>
+            <span>Panoya Kopyala</span>
+          </button>
+
+          <button onclick="executeExportAction('new_tab')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition flex items-center gap-1.5">
+            <span>🌐</span>
+            <span>Yeni Sekmede Aç</span>
+          </button>
+
+          <button onclick="executeExportAction('print')" class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition flex items-center gap-1.5 shadow-md">
+            <span>🖨️</span>
+            <span>Yazdır / PDF</span>
+          </button>
+
+          <button onclick="executeExportAction('download')" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/30">
+            <span>📥</span>
+            <span>Dosyayı İndir</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -655,24 +1115,27 @@
 
     function setMainTab(tab) {
       currentTab = tab;
-      const tabs = ['graph', 'overview', 'inspector'];
+      const tabs = ['graph', 'overview', 'inspector', 'reader'];
       const btnMap = {
         graph: document.getElementById('tabBtnGraph'),
         overview: document.getElementById('tabBtnOverview'),
-        inspector: document.getElementById('tabBtnInspector')
+        inspector: document.getElementById('tabBtnInspector'),
+        reader: document.getElementById('tabBtnReader')
       };
       const panelMap = {
         graph: document.getElementById('tabGraph'),
         overview: document.getElementById('tabOverview'),
-        inspector: document.getElementById('tabInspector')
+        inspector: document.getElementById('tabInspector'),
+        reader: document.getElementById('tabReader')
       };
 
       for (const t of tabs) {
+        if (!btnMap[t] || !panelMap[t]) continue;
         if (t === tab) {
-          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition';
+          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition flex items-center gap-1.5';
           panelMap[t].classList.remove('hidden');
         } else {
-          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition';
+          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1.5';
           panelMap[t].classList.add('hidden');
         }
       }
@@ -710,6 +1173,11 @@
         pill.textContent = `${runningCount}/${(s.agents || []).length}`;
       }
 
+      const readerBadge = document.getElementById('readerTabCountBadge');
+      if (readerBadge) {
+        readerBadge.textContent = (s.messages || []).length;
+      }
+
       const clearBtn = document.getElementById('clearAgentFilterBtn');
       if (selectedAgentFilterId) {
         clearBtn.classList.remove('hidden');
@@ -724,6 +1192,8 @@
         renderMessages(s);
       } else if (currentTab === 'inspector') {
         renderInspectorTab();
+      } else if (currentTab === 'reader') {
+        renderReaderTab(s);
       }
     }
 
@@ -1592,7 +2062,7 @@
               </div>
               ${m.kind === 'TASK_DELEGATION' ? getModelBadgeHtml(m.model) : ''}
             </div>
-            <span class="mono text-[11px] text-slate-400">${formatTime(m.timestamp)}</span>
+            <span class="mono text-[11px] text-slate-400" title="${escapeHtml(m.timestamp || '')}">🕒 ${formatFullDateTime(m.timestamp)}</span>
           </div>
           <pre id="${domId}" class="text-xs text-slate-100 whitespace-pre-wrap font-sans leading-relaxed overflow-x-auto">${escapeHtml(shortText)}</pre>
           ${
@@ -1916,7 +2386,7 @@
                   </div>
                   ${isDelegation ? getModelBadgeHtml(m.model) : ''}
                 </div>
-                <span class="mono text-[11px] text-slate-400">${formatTime(m.timestamp)}</span>
+                <span class="mono text-[11px] text-slate-400" title="${escapeHtml(m.timestamp || '')}">🕒 ${formatFullDateTime(m.timestamp)}</span>
               </div>
 
               <pre id="${msgDomId}" class="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed font-sans overflow-x-auto">${escapeHtml(previewText)}</pre>
@@ -2105,6 +2575,617 @@
 
     function closeProfilesModal() {
       document.getElementById('profilesModal').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // TAB 3: COMFORTABLE READER MODE & EXPORT MODULE
+    // =========================================================================
+
+    let readerFlowFilter = 'ALL'; // 'ALL' | 'USER_TO_AGENT' | 'AGENT_TO_USER' | 'AGENT_TO_AGENT'
+    let readerAgentFilter = 'ALL';
+    let readerOrder = 'asc'; // 'asc' (chronological 1->N default) | 'desc'
+    let readerFontSize = 'md'; // 'sm' | 'md' | 'lg' | 'xl'
+    let readerTheme = 'dark'; // 'dark' | 'paper'
+    let readerBookWidth = true; // true = 896px centered, false = full width
+    let readerExpandAll = true; // true = unclipped full text for reading
+    let readerSearchQuery = '';
+
+    function formatFullDateTime(iso) {
+      if (!iso) return '-';
+      try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        const day = String(d.getDate()).padStart(2, '0');
+        const monthNames = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+        const month = monthNames[d.getMonth()] || String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const time = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `${day} ${month} ${year} • ${time}`;
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function formatDateOnly(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        const day = String(d.getDate()).padStart(2, '0');
+        const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        const month = monthNames[d.getMonth()] || '';
+        const year = d.getFullYear();
+        return `${day} ${month} ${year}`;
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '0 sn';
+      const totalSec = Math.floor(ms / 1000);
+      if (totalSec < 60) return `${totalSec} sn`;
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      if (min < 60) return `${min} dk ${sec > 0 ? sec + ' sn' : ''}`.trim();
+      const hr = Math.floor(min / 60);
+      const remMin = min % 60;
+      return `${hr} sa ${remMin > 0 ? remMin + ' dk' : ''}`.trim();
+    }
+
+    function renderReadableMarkdown(text) {
+      if (!text) return '';
+      let escaped = escapeHtml(text);
+      const codeBlocks = [];
+
+      // Extract fenced code blocks
+      escaped = escaped.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        const id = codeBlocks.length;
+        const cleanLang = lang.trim() || 'kod';
+        const cleanCode = code.replace(/\n$/, '');
+        codeBlocks.push({ lang: cleanLang, code: cleanCode });
+        return `§§CODEBLOCK_${id}§§`;
+      });
+
+      // Inline code
+      escaped = escaped.replace(/`([^`\n]+)`/g, '<code class="mono px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 text-[0.9em] border border-slate-700/60">$1</code>');
+
+      // Blockquotes
+      escaped = escaped.replace(/(^|\n)&gt; (.*?)(?=\n|$)/g, '$1<blockquote class="border-l-4 border-indigo-500 pl-3 my-1.5 text-slate-300 italic">$2</blockquote>');
+
+      // Headings
+      escaped = escaped.replace(/(^|\n)### (.*?)(?=\n|$)/g, '$1<h3 class="text-sm font-bold text-white mt-3 mb-1">$2</h3>');
+      escaped = escaped.replace(/(^|\n)## (.*?)(?=\n|$)/g, '$1<h2 class="text-base font-bold text-white mt-3.5 mb-1.5 pb-1 border-b border-slate-800">$2</h2>');
+      escaped = escaped.replace(/(^|\n)# (.*?)(?=\n|$)/g, '$1<h1 class="text-lg font-bold text-white mt-4 mb-2 pb-1 border-b border-slate-800">$2</h1>');
+
+      // Bold & Italic & Strike
+      escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-white">$1</strong>');
+      escaped = escaped.replace(/\*([^*]+)\*/g, '<em class="italic text-slate-300">$1</em>');
+      escaped = escaped.replace(/~~([^~]+)~~/g, '<del class="line-through text-slate-500">$1</del>');
+
+      // Lists
+      escaped = escaped.replace(/(^|\n)[*-] (.*?)(?=\n|$)/g, '$1<li class="ml-4 list-disc text-slate-200 my-0.5">$2</li>');
+      escaped = escaped.replace(/(^|\n)(\d+)\. (.*?)(?=\n|$)/g, '$1<li class="ml-4 list-decimal text-slate-200 my-0.5">$3</li>');
+
+      // Reinsert code blocks with copy buttons
+      escaped = escaped.replace(/§§CODEBLOCK_(\d+)§§/g, (m, id) => {
+        const item = codeBlocks[parseInt(id, 10)];
+        if (!item) return '';
+        const blockUid = 'cb-' + Math.random().toString(36).substring(2, 9);
+        const rawForCopy = item.code
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"');
+
+        return `
+          <div class="my-3 rounded-xl border border-slate-800 bg-slate-950/90 overflow-hidden shadow-md">
+            <div class="flex items-center justify-between px-3.5 py-1.5 bg-slate-900 border-b border-slate-800/80 text-[11px]">
+              <span class="mono font-semibold text-indigo-400 uppercase tracking-wider">${item.lang}</span>
+              <button
+                onclick="copyCodeBlock('${blockUid}', this)"
+                data-raw="${escapeHtml(rawForCopy)}"
+                class="print-copy-btn text-[11px] mono text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
+              >
+                <span>📋</span>
+                <span>Kopyala</span>
+              </button>
+            </div>
+            <pre id="${blockUid}" class="p-3.5 text-xs text-slate-200 mono overflow-x-auto whitespace-pre leading-relaxed">${item.code}</pre>
+          </div>
+        `;
+      });
+
+      return escaped;
+    }
+
+    function copyCodeBlock(id, btn) {
+      const raw = btn.getAttribute('data-raw') || '';
+      navigator.clipboard.writeText(raw).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<span>✓</span><span>Kopyalandı!</span>';
+        btn.classList.add('text-emerald-400');
+        setTimeout(() => {
+          btn.innerHTML = orig;
+          btn.classList.remove('text-emerald-400');
+        }, 1800);
+      });
+    }
+
+    function copyRawMessageText(rawText, btn) {
+      navigator.clipboard.writeText(rawText).then(() => {
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<span>✓</span><span>Kopyalandı</span>';
+        btn.classList.add('text-emerald-400');
+        setTimeout(() => {
+          btn.innerHTML = orig;
+          btn.classList.remove('text-emerald-400');
+        }, 1800);
+      });
+    }
+
+    function setReaderFlowFilter(flow) {
+      readerFlowFilter = flow;
+      ['ALL', 'USER_TO_AGENT', 'AGENT_TO_USER', 'AGENT_TO_AGENT'].forEach((f) => {
+        const btn = document.getElementById(`flowBtn${f}`);
+        if (!btn) return;
+        if (f === flow) {
+          btn.className = 'px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded-lg font-medium transition text-slate-300 hover:text-white';
+        }
+      });
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function onReaderAgentChange(val) {
+      readerAgentFilter = val;
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function setReaderOrder(order) {
+      readerOrder = order;
+      const ascBtn = document.getElementById('orderBtnAsc');
+      const descBtn = document.getElementById('orderBtnDesc');
+      if (order === 'asc') {
+        ascBtn.className = 'px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white flex items-center gap-1';
+        descBtn.className = 'px-2.5 py-1 rounded-lg font-medium transition text-slate-400 hover:text-white flex items-center gap-1';
+      } else {
+        descBtn.className = 'px-2.5 py-1 rounded-lg font-medium transition bg-indigo-600 text-white flex items-center gap-1';
+        ascBtn.className = 'px-2.5 py-1 rounded-lg font-medium transition text-slate-400 hover:text-white flex items-center gap-1';
+      }
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function setReaderFontSize(sz) {
+      readerFontSize = sz;
+      ['sm', 'md', 'lg', 'xl'].forEach((sVal) => {
+        const b = document.getElementById(`fontSizeBtn-${sVal}`);
+        if (!b) return;
+        b.className = sVal === sz
+          ? 'px-1.5 py-0.5 rounded text-[11px] font-mono bg-indigo-600 text-white font-bold'
+          : 'px-1.5 py-0.5 rounded text-[11px] font-mono text-slate-400 hover:text-white';
+      });
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function toggleReaderBookWidth() {
+      readerBookWidth = !readerBookWidth;
+      const lbl = document.getElementById('readerBookWidthLabel');
+      const icon = document.getElementById('readerBookWidthIcon');
+      if (readerBookWidth) {
+        lbl.textContent = 'Kitap Genişliği';
+        icon.textContent = '📖';
+      } else {
+        lbl.textContent = 'Tam Genişlik';
+        icon.textContent = '↔️';
+      }
+      const container = document.getElementById('readerMessagesContainer');
+      if (container) {
+        container.className = readerBookWidth ? 'w-full max-w-4xl space-y-4' : 'w-full max-w-full px-2 space-y-4';
+      }
+    }
+
+    function toggleReaderTheme() {
+      readerTheme = readerTheme === 'dark' ? 'paper' : 'dark';
+      const root = document.getElementById('tabReader');
+      const lbl = document.getElementById('readerThemeLabel');
+      const icon = document.getElementById('readerThemeIcon');
+      if (readerTheme === 'paper') {
+        root.classList.add('reader-paper');
+        lbl.textContent = 'Karanlık Tema';
+        icon.textContent = '🌙';
+      } else {
+        root.classList.remove('reader-paper');
+        lbl.textContent = 'Açık Kağıt Teması';
+        icon.textContent = '☀️';
+      }
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function toggleReaderExpandAll() {
+      readerExpandAll = !readerExpandAll;
+      const lbl = document.getElementById('readerExpandAllLabel');
+      lbl.textContent = readerExpandAll ? 'Tam Metinler Açık' : 'Kısaltılmış Önizleme';
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function onReaderSearch(val) {
+      readerSearchQuery = (val || '').toLowerCase().trim();
+      const s = getCurrentSession();
+      if (s) renderReaderTab(s);
+    }
+
+    function populateReaderAgentDropdown(session) {
+      const sel = document.getElementById('readerAgentSelect');
+      const exportSel = document.getElementById('exportAgentSelect');
+      if (!sel || !session) return;
+
+      const agents = session.agents || [];
+      let opts = `<option value="ALL">👥 Tüm Ajanlar (${agents.length} ajan)</option>`;
+      agents.forEach((a, idx) => {
+        const title = a.isRoot ? `👑 ${a.role}` : `🤖 #${idx + 1} ${a.role} (${a.typeName})`;
+        opts += `<option value="${a.id}">${escapeHtml(title)}</option>`;
+      });
+
+      sel.innerHTML = opts;
+      if (exportSel) exportSel.innerHTML = opts;
+
+      if (readerAgentFilter && [...sel.options].some((o) => o.value === readerAgentFilter)) {
+        sel.value = readerAgentFilter;
+      } else {
+        readerAgentFilter = 'ALL';
+      }
+    }
+
+    function renderReaderTab(session) {
+      const s = session || getCurrentSession();
+      if (!s) return;
+
+      populateReaderAgentDropdown(s);
+      const container = document.getElementById('readerMessagesContainer');
+      const allMsgs = s.messages || [];
+
+      const countBadge = document.getElementById('readerTabCountBadge');
+      if (countBadge) countBadge.textContent = allMsgs.length;
+
+      const countU2A = allMsgs.filter((m) => m.kind === 'USER_PROMPT').length;
+      const countA2U = allMsgs.filter((m) => m.kind === 'AGENT_TO_USER').length;
+      const countA2A = allMsgs.filter((m) => m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE').length;
+
+      document.getElementById('flowCountALL').textContent = allMsgs.length;
+      document.getElementById('flowCountUSER_TO_AGENT').textContent = countU2A;
+      document.getElementById('flowCountAGENT_TO_USER').textContent = countA2U;
+      document.getElementById('flowCountAGENT_TO_AGENT').textContent = countA2A;
+
+      let filtered = allMsgs.map((m, origIdx) => ({ ...m, _origIdx: origIdx }));
+
+      if (readerFlowFilter === 'USER_TO_AGENT') {
+        filtered = filtered.filter((m) => m.kind === 'USER_PROMPT');
+      } else if (readerFlowFilter === 'AGENT_TO_USER') {
+        filtered = filtered.filter((m) => m.kind === 'AGENT_TO_USER');
+      } else if (readerFlowFilter === 'AGENT_TO_AGENT') {
+        filtered = filtered.filter((m) => m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE');
+      }
+
+      if (readerAgentFilter !== 'ALL') {
+        filtered = filtered.filter((m) => m.sender.id === readerAgentFilter || m.recipient.id === readerAgentFilter);
+      }
+
+      if (readerSearchQuery) {
+        filtered = filtered.filter((m) =>
+          (m.content || '').toLowerCase().includes(readerSearchQuery) ||
+          (m.sender.role || '').toLowerCase().includes(readerSearchQuery) ||
+          (m.recipient.role || '').toLowerCase().includes(readerSearchQuery)
+        );
+      }
+
+      if (readerOrder === 'desc') {
+        filtered.sort((a, b) => b._origIdx - a._origIdx);
+      } else {
+        filtered.sort((a, b) => a._origIdx - b._origIdx);
+      }
+
+      const fontClass = `reader-font-${readerFontSize}`;
+
+      const sessionStartMs = allMsgs.length > 0 && allMsgs[0].timestamp ? new Date(allMsgs[0].timestamp).getTime() : s.mtimeMs;
+      const sessionEndMs = allMsgs.length > 0 && allMsgs[allMsgs.length - 1].timestamp ? new Date(allMsgs[allMsgs.length - 1].timestamp).getTime() : s.mtimeMs;
+      const sessionDurationStr = formatDuration(Math.max(0, sessionEndMs - sessionStartMs));
+
+      let html = `
+        <div class="reader-banner rounded-2xl border border-indigo-500/30 bg-slate-900/90 p-4 md:p-5 shadow-xl space-y-3 mb-6 transition">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">📖 Oturum Kronolojik Akışı & Zaman Bütünlüğü</span>
+                <span class="mono text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300">ID: ${s.id}</span>
+              </div>
+              <h2 class="text-base font-bold text-white mt-0.5">${escapeHtml(s.title)}</h2>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30">
+                ⏱️ Toplam Süre: ${sessionDurationStr}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block">Başlangıç Zamanı</span>
+              <strong class="text-slate-100 mono text-[11px]">${formatFullDateTime(allMsgs[0]?.timestamp || s.lastUpdated)}</strong>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block">Son Hareket Zamanı</span>
+              <strong class="text-slate-100 mono text-[11px]">${formatFullDateTime(allMsgs[allMsgs.length - 1]?.timestamp || s.lastUpdated)}</strong>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block">Toplam Mesaj / Filtrelenen</span>
+              <strong class="text-cyan-300 mono text-[11px]">${allMsgs.length} / ${filtered.length} mesaj</strong>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800">
+              <span class="text-[10px] text-slate-400 block">Görev Alan Ajan Sayısı</span>
+              <strong class="text-emerald-400 mono text-[11px]">${(s.agents || []).length} aktif ajan</strong>
+            </div>
+          </div>
+        </div>
+      `;
+
+      if (filtered.length === 0) {
+        html += `
+          <div class="p-12 text-center border border-slate-800 rounded-2xl bg-slate-900/40 space-y-3">
+            <div class="text-3xl">📭</div>
+            <h4 class="text-sm font-bold text-white">Bu filtre kriterine uygun mesaj bulunamadı.</h4>
+            <p class="text-xs text-slate-400">Üstteki akış butonlarından 'Tümü'nü seçebilir veya arama terimini temizleyebilirsiniz.</p>
+          </div>
+        `;
+        container.innerHTML = html;
+        return;
+      }
+
+      let lastDateString = null;
+
+      filtered.forEach((m) => {
+        const msgDateStr = formatDateOnly(m.timestamp);
+        if (msgDateStr && msgDateStr !== lastDateString) {
+          lastDateString = msgDateStr;
+          html += `
+            <div class="flex items-center gap-3 my-4">
+              <div class="h-px flex-1 bg-slate-800"></div>
+              <span class="reader-divider text-[11px] font-bold px-3 py-1 rounded-full bg-slate-900 text-slate-300 border border-slate-800 shadow-sm">
+                📅 ${msgDateStr}
+              </span>
+              <div class="h-px flex-1 bg-slate-800"></div>
+            </div>
+          `;
+        }
+
+        const meta = getMessageBadgeMeta(m);
+        const seqNumber = m._origIdx + 1;
+        const msgTimeMs = m.timestamp ? new Date(m.timestamp).getTime() : sessionStartMs;
+        const deltaStart = formatDuration(Math.max(0, msgTimeMs - sessionStartMs));
+
+        let deltaPrevStr = '';
+        if (m._origIdx > 0 && allMsgs[m._origIdx - 1]?.timestamp) {
+          const prevMs = new Date(allMsgs[m._origIdx - 1].timestamp).getTime();
+          deltaPrevStr = `+${formatDuration(Math.max(0, msgTimeMs - prevMs))}`;
+        }
+
+        const rawContent = m.content || '';
+        const textToRender = !readerExpandAll && rawContent.length > 900 ? rawContent.slice(0, 900) + '\n\n... [Tam Metinler Açık butonuna tıklayarak tamamını görebilirsiniz]' : rawContent;
+        const renderedHtml = renderReadableMarkdown(textToRender);
+
+        html += `
+          <div class="reader-card rounded-2xl border p-4 md:p-5 ${meta.borderCls} shadow-lg space-y-3 transition">
+            <!-- Message Header Row -->
+            <div class="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-800/80">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="mono text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">#${seqNumber}</span>
+                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded ${meta.tagCls}">${meta.tag}</span>
+
+                <div class="flex items-center gap-1.5 text-xs font-semibold">
+                  <span class="text-white px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.sender.role)}</span>
+                  <span class="text-slate-400 font-bold">➔</span>
+                  <span class="text-cyan-300 px-2.5 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.recipient.role)}</span>
+                </div>
+
+                ${m.kind === 'TASK_DELEGATION' ? getModelBadgeHtml(m.model) : ''}
+              </div>
+
+              <!-- Time & Elapsed Badges -->
+              <div class="flex flex-wrap items-center gap-2 text-right">
+                <span class="mono text-xs font-semibold text-slate-300">
+                  🕒 ${formatFullDateTime(m.timestamp)}
+                </span>
+                <span class="mono text-[10px] px-2 py-0.5 rounded bg-slate-900 text-indigo-300 border border-slate-800" title="Oturum başlangıcından geçen süre">
+                  ⏳ Başlangıçtan +${deltaStart}
+                </span>
+                ${deltaPrevStr ? `<span class="mono text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800" title="Önceki adımdan sonra geçen süre">${deltaPrevStr}</span>` : ''}
+
+                <button
+                  onclick="copyRawMessageText(${escapeHtml(JSON.stringify(rawContent))}, this)"
+                  class="print-copy-btn text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition flex items-center gap-1"
+                  title="Mesajı panoya kopyala"
+                >
+                  <span>📋</span>
+                  <span>Kopyala</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Readable Message Body -->
+            <div class="readable-prose ${fontClass} text-slate-100 overflow-x-auto whitespace-pre-wrap">
+              ${renderedHtml}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function openExportModal() {
+      const s = getCurrentSession();
+      if (!s) return;
+      populateReaderAgentDropdown(s);
+      updateExportPreview();
+      document.getElementById('exportModal').classList.remove('hidden');
+    }
+
+    function closeExportModal() {
+      document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    function updateExportPreview() {
+      const s = getCurrentSession();
+      if (!s) return;
+      const allMsgs = s.messages || [];
+
+      const incUser = document.getElementById('exportFlowUserPrompt').checked;
+      const incAgentUser = document.getElementById('exportFlowAgentUser').checked;
+      const incAgentAgent = document.getElementById('exportFlowAgentAgent').checked;
+      const agentId = document.getElementById('exportAgentSelect').value;
+
+      const matched = allMsgs.filter((m) => {
+        if (m.kind === 'USER_PROMPT' && !incUser) return false;
+        if (m.kind === 'AGENT_TO_USER' && !incAgentUser) return false;
+        if ((m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE') && !incAgentAgent) return false;
+        if (agentId !== 'ALL' && m.sender.id !== agentId && m.recipient.id !== agentId) return false;
+        return true;
+      });
+
+      document.getElementById('exportMatchCountBadge').textContent = `${matched.length} mesaj`;
+      document.getElementById('exportMatchSummary').textContent = `${s.title} • ${s.project} oturumu (${matched.length} mesaj seçildi)`;
+    }
+
+    function generateClientExport(session, format, filteredMsgs, order) {
+      const sorted = [...filteredMsgs];
+      if (order === 'desc') {
+        sorted.reverse();
+      }
+
+      if (format === 'json') {
+        return JSON.stringify({
+          sessionId: session.id,
+          project: session.project,
+          title: session.title,
+          exportedAt: new Date().toISOString(),
+          messageCount: sorted.length,
+          messages: sorted
+        }, null, 2);
+      }
+
+      if (format === 'txt') {
+        let out = `================================================================================\n`;
+        out += `ANTIGRAVITY AGENT MONITOR - OTURUM RAPORU\n`;
+        out += `Oturum: ${session.title}\n`;
+        out += `ID: ${session.id} | Proje: ${session.project}\n`;
+        out += `Rapor Tarihi: ${formatFullDateTime(new Date().toISOString())}\n`;
+        out += `Toplam Mesaj: ${sorted.length}\n`;
+        out += `================================================================================\n\n`;
+
+        sorted.forEach((m, idx) => {
+          out += `[#${idx + 1}] ${formatFullDateTime(m.timestamp)} | ${m.sender.role} -> ${m.recipient.role} (${m.kind})\n`;
+          out += `${m.content || ''}\n`;
+          out += `--------------------------------------------------------------------------------\n\n`;
+        });
+        return out;
+      }
+
+      if (format === 'md') {
+        let out = `# 📖 Oturum Raporu: ${session.title}\n\n`;
+        out += `- **Proje**: \`${session.project}\`\n`;
+        out += `- **Oturum ID**: \`${session.id}\`\n`;
+        out += `- **Dışa Aktarma Tarihi**: ${formatFullDateTime(new Date().toISOString())}\n`;
+        out += `- **Filtrelenen Mesaj**: ${sorted.length} / ${session.messages.length}\n\n`;
+        out += `## 💬 Mesaj Akışı (${order === 'asc' ? 'Kronolojik 1 ➔ N' : 'En Yeni Üstte'})\n\n`;
+
+        sorted.forEach((m, idx) => {
+          out += `### #${idx + 1} - ${m.sender.role} ➔ ${m.recipient.role}\n`;
+          out += `- **Tür**: \`${m.kind}\`\n`;
+          out += `- **Tarih**: ${formatFullDateTime(m.timestamp)}\n`;
+          if (m.model) out += `- **Model**: \`${m.model}\`\n`;
+          out += `\n${m.content || ''}\n\n---\n\n`;
+        });
+        return out;
+      }
+
+      let html = `<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"/><title>${escapeHtml(session.title)} - Export</title>`;
+      html += `<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6;color:#1e293b;padding:2rem;max-width:900px;margin:auto;} h1{border-bottom:2px solid #e2e8f0;padding-bottom:8px;} .card{border:1px solid #cbd5e1;border-radius:8px;padding:16px;margin-bottom:16px;page-break-inside:avoid;} .header{display:flex;justify-content:space-between;border-bottom:1px solid #e2e8f0;padding-bottom:8px;margin-bottom:12px;font-size:12px;color:#64748b;} pre{background:#f8fafc;padding:12px;border-radius:6px;overflow-x:auto;font-family:monospace;white-space:pre-wrap;border:1px solid #e2e8f0;}</style></head><body>`;
+      html += `<h1>📖 ${escapeHtml(session.title)}</h1>`;
+      html += `<p><strong>Proje:</strong> ${escapeHtml(session.project)} | <strong>ID:</strong> ${escapeHtml(session.id)} | <strong>Tarih:</strong> ${formatFullDateTime(new Date().toISOString())}</p>`;
+      sorted.forEach((m, idx) => {
+        html += `<div class="card"><div class="header"><span><strong>#${idx + 1}</strong> ${escapeHtml(m.sender.role)} ➔ ${escapeHtml(m.recipient.role)} [${escapeHtml(m.kind)}]</span><span>${formatFullDateTime(m.timestamp)}</span></div><pre>${escapeHtml(m.content || '')}</pre></div>`;
+      });
+      html += `</body></html>`;
+      return html;
+    }
+
+    async function executeExportAction(actionType) {
+      const s = getCurrentSession();
+      if (!s) return;
+
+      const incUser = document.getElementById('exportFlowUserPrompt').checked;
+      const incAgentUser = document.getElementById('exportFlowAgentUser').checked;
+      const incAgentAgent = document.getElementById('exportFlowAgentAgent').checked;
+      const agentId = document.getElementById('exportAgentSelect').value;
+      const order = document.getElementById('exportOrderSelect').value;
+      const format = document.querySelector('input[name="exportFormatRadio"]:checked')?.value || 'html';
+
+      const flows = [];
+      if (incUser) flows.push('USER_PROMPT');
+      if (incAgentUser) flows.push('AGENT_TO_USER');
+      if (incAgentAgent) { flows.push('TASK_DELEGATION'); flows.push('AGENT_MESSAGE'); }
+
+      const allMsgs = s.messages || [];
+      const matched = allMsgs.filter((m) => {
+        if (!flows.includes(m.kind)) return false;
+        if (agentId !== 'ALL' && m.sender.id !== agentId && m.recipient.id !== agentId) return false;
+        return true;
+      });
+
+      if (actionType === 'clipboard') {
+        const text = generateClientExport(s, format === 'html' ? 'md' : format, matched, order);
+        navigator.clipboard.writeText(text).then(() => {
+          alert('Seçilen mesaj akışı panoya kopyalandı!');
+          closeExportModal();
+        });
+        return;
+      }
+
+      const url = `/api/export/${s.id}?format=${format}&flows=${flows.join(',')}&agentId=${agentId}&order=${order}${actionType === 'download' ? '&download=1' : ''}${actionType === 'print' ? '&print=1' : ''}`;
+
+      window.open(url, '_blank');
+      closeExportModal();
+    }
+
+    function directPrintOrExport(action) {
+      const s = getCurrentSession();
+      if (!s) return;
+
+      let flowsParam = 'all';
+      if (readerFlowFilter === 'USER_TO_AGENT') flowsParam = 'u2a';
+      else if (readerFlowFilter === 'AGENT_TO_USER') flowsParam = 'a2u';
+      else if (readerFlowFilter === 'AGENT_TO_AGENT') flowsParam = 'a2a';
+
+      const agentParam = readerAgentFilter !== 'ALL' ? `&agentId=${encodeURIComponent(readerAgentFilter)}` : '';
+      const searchParam = readerSearchQuery ? `&search=${encodeURIComponent(readerSearchQuery)}` : '';
+
+      if (action === 'print') {
+        const printUrl = `/api/export/${s.id}?format=html&print=1&flows=${flowsParam}&order=${readerOrder}${agentParam}${searchParam}`;
+        window.open(printUrl, '_blank');
+      } else if (action === 'html') {
+        const htmlUrl = `/api/export/${s.id}?format=html&flows=${flowsParam}&order=${readerOrder}${agentParam}${searchParam}`;
+        window.open(htmlUrl, '_blank');
+      } else {
+        const dlUrl = `/api/export/${s.id}?format=${action}&download=1&flows=${flowsParam}&order=${readerOrder}${agentParam}${searchParam}`;
+        window.open(dlUrl, '_blank');
+      }
     }
 
     window.addEventListener('resize', () => {

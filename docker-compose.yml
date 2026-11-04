@@ -16,5 +16,6 @@ services:
       - ./data:/app/data
       - ./public:/app/public:ro
       - ./server.js:/app/server.js:ro
+      - ./exporter.js:/app/exporter.js:ro
       - ./sync_from_agy.py:/app/sync_from_agy.py:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const exporter = require('./exporter.js');
 
 const PORT = parseInt(process.env.PORT || '8090', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -757,6 +758,7 @@ function buildWorldState() {
         messages.push({
           id: `user-in:${cid}:${ui.stepIndex}`,
           kind: 'USER_PROMPT',
+          flowType: 'USER_TO_AGENT',
           stepOrder: ui.stepIndex,
           timestamp: ui.timestamp || conv.firstTimestamp,
           sender: userMeta,
@@ -767,6 +769,7 @@ function buildWorldState() {
         messages.push({
           id: `user-out:${cid}:${ui.stepIndex}`,
           kind: 'AGENT_TO_USER',
+          flowType: 'AGENT_TO_USER',
           stepOrder: ui.stepIndex,
           timestamp: ui.timestamp || conv.lastTimestamp,
           sender: getAgentMeta(cid),
@@ -787,6 +790,7 @@ function buildWorldState() {
         messages.push({
           id: key,
           kind: 'TASK_DELEGATION',
+          flowType: 'AGENT_TO_AGENT',
           timestamp: inv.timestamp || c.firstTimestamp,
           sender: getAgentMeta(id),
           recipient: getAgentMeta(inv.childId),
@@ -809,6 +813,7 @@ function buildWorldState() {
         messages.push({
           id: `msg:${id}:${out.stepIndex}`,
           kind: 'AGENT_MESSAGE',
+          flowType: 'AGENT_TO_AGENT',
           timestamp: out.timestamp || c.lastTimestamp,
           sender: getAgentMeta(id),
           recipient: getAgentMeta(out.recipient),
@@ -830,6 +835,7 @@ function buildWorldState() {
         messages.push({
           id: `sys:${id}:${inc.stepIndex}`,
           kind: 'AGENT_MESSAGE',
+          flowType: 'AGENT_TO_AGENT',
           timestamp: inc.timestamp || c.lastTimestamp,
           sender: getAgentMeta(inc.sender),
           recipient: getAgentMeta(id),
@@ -974,6 +980,85 @@ const server = http.createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     return res.end(JSON.stringify(detail));
+  }
+
+  if (pathname.startsWith('/api/export/')) {
+    const sessionId = pathname.replace('/api/export/', '').trim();
+    await triggerDockerSyncIfNeeded();
+    const state = buildWorldState();
+    const session = state.sessions.find((s) => s.id === sessionId);
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+      return res.end(JSON.stringify({ error: 'Session not found' }));
+    }
+
+    const format = (parsedUrl.query.format || 'html').toLowerCase();
+    const flows = parsedUrl.query.flows || 'all';
+    const agentId = parsedUrl.query.agentId || null;
+    const order = (parsedUrl.query.order || 'asc').toLowerCase();
+    const search = parsedUrl.query.search || null;
+    const isDownload = parsedUrl.query.download === '1' || parsedUrl.query.download === 'true';
+    const isPrint = parsedUrl.query.print === '1' || parsedUrl.query.print === 'true';
+
+    const prepared = exporter.filterAndPrepareExportData(session, {
+      flows,
+      agentId,
+      order,
+      search
+    });
+
+    const safeTitle = (session.title || 'oturum')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/gi, '_')
+      .slice(0, 30);
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const baseFilename = `${safeTitle}_${session.id.slice(0, 8)}_${dateStamp}`;
+
+    if (format === 'json') {
+      const jsonStr = exporter.generateJsonExport(session, prepared, { format, flows, agentId, order, search });
+      const filename = `${baseFilename}.json`;
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': isDownload ? `attachment; filename="${filename}"` : 'inline'
+      });
+      return res.end(jsonStr);
+    }
+
+    if (format === 'md' || format === 'markdown') {
+      const mdStr = exporter.generateMarkdownExport(session, prepared, { format, flows, agentId, order, search });
+      const filename = `${baseFilename}.md`;
+      res.writeHead(200, {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Disposition': isDownload ? `attachment; filename="${filename}"` : 'inline'
+      });
+      return res.end(mdStr);
+    }
+
+    if (format === 'txt' || format === 'text') {
+      const txtStr = exporter.generateTextExport(session, prepared, { format, flows, agentId, order, search });
+      const filename = `${baseFilename}.txt`;
+      res.writeHead(200, {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': isDownload ? `attachment; filename="${filename}"` : 'inline'
+      });
+      return res.end(txtStr);
+    }
+
+    // Default: Standalone HTML report
+    const htmlStr = exporter.generateHtmlReport(session, prepared, {
+      autoPrint: isPrint,
+      format,
+      flows,
+      agentId,
+      order,
+      search
+    });
+    const filename = `${baseFilename}.html`;
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': isDownload ? `attachment; filename="${filename}"` : 'inline'
+    });
+    return res.end(htmlStr);
   }
 
   // Static files in /public
