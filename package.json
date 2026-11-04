@@ -1,0 +1,9 @@
+{
+  "name": "agy-agent-monitor",
+  "version": "1.0.0",
+  "description": "Real-time Multi-Agent & Inter-Agent Message Monitor for Google Antigravity",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,0 +1,20 @@
+services:
+  agent-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agy-agent-monitor
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      - PORT=8090
+      - HOST=0.0.0.0
+      - MIRROR_DIR=/app/data/mirror
+      - DOCKER_SOCKET=/var/run/docker.sock
+    volumes:
+      - ./data:/app/data
+      - ./public:/app/public:ro
+      - ./server.js:/app/server.js:ro
+      - ./sync_from_agy.py:/app/sync_from_agy.py:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro

@@ -1,0 +1,2120 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antigravity Multi-Agent Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #070b14;
+      color: #e2e8f0;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+      70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .agent-running {
+      animation: pulse-ring 2s infinite;
+    }
+    @keyframes dash-flow {
+      to {
+        stroke-dashoffset: -40;
+      }
+    }
+    .edge-animated {
+      stroke-dasharray: 7 5;
+      animation: dash-flow 1.2s linear infinite;
+    }
+    .graph-bg-grid {
+      background-color: #070b14;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(99, 102, 241, 0.16) 1px, transparent 0);
+      background-size: 28px 28px;
+    }
+  </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col select-none">
+
+  <!-- TOP HEADER -->
+  <header class="h-14 border-b border-slate-800/80 bg-slate-950/90 px-4 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-sm tracking-wide text-white">ANTIGRAVITY AGENT MONITOR</h1>
+          <span class="text-[10px] mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">:8090</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Canlı Multi-Agent Graph, Dinamik Model Seçimi ve Ajanlar Arası Mesaj İzleyici</p>
+      </div>
+    </div>
+
+    <!-- Global Stats & Controls -->
+    <div class="flex items-center gap-4">
+      <div id="globalStats" class="hidden md:flex items-center gap-4 text-xs bg-slate-900/90 border border-slate-800 px-3.5 py-1.5 rounded-lg">
+        <div><span class="text-slate-400">Projeler:</span> <strong id="statProjects" class="text-white ml-1">0</strong></div>
+        <div class="h-3 w-px bg-slate-800"></div>
+        <div><span class="text-slate-400">Multi-Agent Oturum:</span> <strong id="statMultiSessions" class="text-emerald-400 ml-1">0</strong></div>
+        <div class="h-3 w-px bg-slate-800"></div>
+        <div><span class="text-slate-400">Tanımlı Ajan Tipi:</span> <strong id="statProfiles" class="text-cyan-400 ml-1">0</strong></div>
+      </div>
+
+      <button onclick="openProfilesModal()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5">
+        <span>🤖</span>
+        <span>Ajan Profilleri</span>
+      </button>
+
+      <div class="flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+        <span id="liveDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="syncLabel" class="mono text-[11px] text-slate-300">Canlı (2sn)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN BODY -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR: PROJECT & SESSION SELECTOR -->
+    <aside class="w-80 border-r border-slate-800/80 bg-slate-950/60 flex flex-col shrink-0">
+      <div class="p-3 border-b border-slate-800/80 space-y-2.5">
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Proje / Klasör Filtresi</label>
+          <select id="projectSelect" onchange="onFilterChange()" class="w-full bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500">
+            <option value="ALL">📁 Tüm Projeler</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input type="checkbox" id="onlyMultiAgentToggle" onchange="onFilterChange()" checked class="rounded bg-slate-900 border-slate-700 text-indigo-500 focus:ring-0" />
+            <span>Sadece Multi-Agent Oturumlar</span>
+          </label>
+          <span id="sessionCountBadge" class="text-[11px] mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">0</span>
+        </div>
+
+        <div class="flex items-center justify-between gap-2">
+          <label class="flex items-center gap-2 text-xs text-emerald-300 cursor-pointer">
+            <input type="checkbox" id="onlyActiveSessionsToggle" onchange="onFilterChange()" class="rounded bg-slate-900 border-slate-700 text-emerald-500 focus:ring-0" />
+            <span>🟢 Sadece Aktif/Çalışan Oturumlar</span>
+          </label>
+        </div>
+
+        <input
+          type="text"
+          id="sessionSearch"
+          oninput="onFilterChange()"
+          placeholder="Görev veya oturum ara..."
+          class="w-full bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+        />
+      </div>
+
+      <!-- Sessions List -->
+      <div id="sessionList" class="flex-1 overflow-y-auto divide-y divide-slate-800/50"></div>
+    </aside>
+
+    <!-- CENTER + RIGHT WORKSPACE -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-slate-900/30 select-text">
+
+      <!-- Selected Session Top Bar -->
+      <div id="sessionHeader" class="px-5 py-3 border-b border-slate-800/80 bg-slate-950/40 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span id="activeProjectBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Proje</span>
+            <span id="activeSessionId" class="text-[11px] mono text-slate-400"></span>
+            <span id="activeSessionStatus" class="text-[10px] font-semibold px-2 py-0.5 rounded-full"></span>
+          </div>
+          <h2 id="activeSessionTitle" class="text-sm font-semibold text-white truncate mt-1">Bir oturum seçin</h2>
+        </div>
+
+        <!-- View Mode Tabs + Active Only Switch -->
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <!-- Toggle Switch: Sadece Çalışan Aktif Ajanları Göster -->
+          <button
+            id="onlyRunningAgentsBtn"
+            onclick="toggleOnlyRunningAgents()"
+            class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300 transition flex items-center gap-2"
+            title="Tamamlanmış alt ajanları gizle, sadece şu an çalışan aktif ajanları göster"
+          >
+            <span id="onlyRunningSwitchTrack" class="w-7 h-4 rounded-full bg-slate-700 relative transition flex items-center p-0.5">
+              <span id="onlyRunningSwitchKnob" class="w-3 h-3 rounded-full bg-slate-300 transform transition"></span>
+            </span>
+            <span>Sadece Çalışan/Aktif Ajanlar</span>
+            <span id="runningAgentCountPill" class="mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400">0</span>
+          </button>
+
+          <div class="flex items-center bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs shrink-0 gap-1">
+            <button id="tabBtnGraph" onclick="setMainTab('graph')" class="px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition">
+              🕸️ İnteraktif Ajan Graph'ı
+            </button>
+            <button id="tabBtnOverview" onclick="setMainTab('overview')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">
+              💬 Kartlar & Mesaj Akışı
+            </button>
+            <button id="tabBtnInspector" onclick="setMainTab('inspector')" class="px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition">
+              🔍 Adım & Düşünce (Thinking)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 0: INTERACTIVE NODE GRAPH (LEFT) + LIVE MESSAGE PANEL (RIGHT)     -->
+      <!-- ===================================================================== -->
+      <div id="tabGraph" class="flex-1 flex overflow-hidden">
+
+        <!-- LEFT: Interactive SVG Graph Area -->
+        <div id="graphTopContainer" class="flex-1 relative overflow-hidden graph-bg-grid flex flex-col">
+
+          <!-- Floating Graph Controls Toolbar -->
+          <div class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+            <div class="flex items-center gap-2 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-xl px-3 py-1.5 shadow-xl pointer-events-auto">
+              <span class="text-[11px] font-semibold text-slate-300">Dizilim:</span>
+              <button id="layoutBtnRadial" onclick="setGraphLayout('radial')" class="text-xs px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium transition">
+                🎯 Radyal (Merkez)
+              </button>
+              <button id="layoutBtnTree" onclick="setGraphLayout('tree')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition">
+                🌳 Hiyerarşik Ağaç
+              </button>
+              <div class="h-4 w-px bg-slate-800 mx-1"></div>
+              <button onclick="replayGraphMessages()" class="text-xs px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-medium transition flex items-center gap-1">
+                <span>▶️</span>
+                <span id="replayBtnLabel">Akışı Canlandır</span>
+              </button>
+            </div>
+
+            <!-- Legend + Zoom Controls -->
+            <div class="flex items-center gap-2 bg-slate-950/90 backdrop-blur border border-slate-800 rounded-xl px-3 py-1.5 shadow-xl pointer-events-auto text-[11px]">
+              <span class="flex items-center gap-1.5 text-indigo-300">
+                <span class="w-3 h-0.5 bg-indigo-400 inline-block"></span> Görev (`invoke_subagent`)
+              </span>
+              <span class="flex items-center gap-1.5 text-emerald-300 ml-2">
+                <span class="w-3 h-0.5 bg-emerald-400 inline-block"></span> Rapor/Mesaj (`send_message`)
+              </span>
+              <div class="h-4 w-px bg-slate-800 mx-1"></div>
+              <button onclick="zoomGraph(1.2)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold" title="Yakınlaştır">+</button>
+              <button onclick="zoomGraph(0.85)" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-white font-bold" title="Uzaklaştır">−</button>
+              <button onclick="resetGraphTransform()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200" title="Merkeze Sıfırla">Sığdır</button>
+            </div>
+          </div>
+
+          <!-- Main Interactive SVG Viewport -->
+          <svg
+            id="agentGraphSvg"
+            class="w-full h-full cursor-grab active:cursor-grabbing select-none"
+            onmousedown="onGraphMouseDown(event)"
+            onmousemove="onGraphMouseMove(event)"
+            onmouseup="onGraphMouseUp(event)"
+            onmouseleave="onGraphMouseUp(event)"
+            onwheel="onGraphWheel(event)"
+          >
+            <defs>
+              <marker id="arrow-user" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+              </marker>
+              <marker id="arrow-reply" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#c084fc" />
+              </marker>
+              <marker id="arrow-task" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#818cf8" />
+              </marker>
+              <marker id="arrow-msg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#34d399" />
+              </marker>
+              <filter id="glow-indigo" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <g id="graphViewport">
+              <g id="graphEdgesLayer"></g>
+              <g id="graphParticlesLayer"></g>
+              <g id="graphNodesLayer"></g>
+            </g>
+          </svg>
+
+          <!-- Replay Media Player & Timeline Scrubber Bar -->
+          <div id="replayBanner" class="hidden absolute bottom-3 left-3 right-3 z-20 bg-slate-950/95 backdrop-blur border border-indigo-500/50 rounded-xl p-3 shadow-2xl space-y-2">
+            <!-- Top Row: Step Info + Speed + Exit -->
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="px-2 py-0.5 rounded bg-indigo-600 text-white text-xs font-bold mono shrink-0" id="replayStepBadge">Adım 1/1</span>
+                <div class="text-xs text-slate-200 truncate font-medium" id="replayStepText"></div>
+              </div>
+
+              <!-- Speed Selector + Close -->
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="text-[11px] text-slate-400 mr-1">Hız:</span>
+                <button onclick="setReplaySpeed(0.5)" id="speedBtn-0.5" class="text-[11px] mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">0.5x</button>
+                <button onclick="setReplaySpeed(1)" id="speedBtn-1" class="text-[11px] mono px-2 py-0.5 rounded bg-indigo-600 text-white font-bold">1x</button>
+                <button onclick="setReplaySpeed(2)" id="speedBtn-2" class="text-[11px] mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">2x</button>
+                <button onclick="setReplaySpeed(4)" id="speedBtn-4" class="text-[11px] mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white">4x</button>
+                <div class="h-4 w-px bg-slate-800 mx-1"></div>
+                <button onclick="stopGraphReplay()" class="text-xs px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-medium">Çık ✕</button>
+              </div>
+            </div>
+
+            <!-- Bottom Row: Play/Pause + Step Prev/Next + Draggable Progress Scrubber -->
+            <div class="flex items-center gap-2.5">
+              <button onclick="stepReplayBy(-1)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold" title="Önceki Adım">⏮</button>
+              <button onclick="toggleReplayPlayPause()" id="replayPlayPauseBtn" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold min-w-[78px]" title="Oynat / Duraklat">⏸ Duraklat</button>
+              <button onclick="stepReplayBy(1)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold" title="Sonraki Adım">⏭</button>
+
+              <input
+                id="replayScrubber"
+                type="range"
+                min="0"
+                max="10"
+                value="0"
+                oninput="onReplayScrub(this.value)"
+                class="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT SIDE PANEL: Live Message Stream (Newest at TOP -> Older below) -->
+        <div class="w-[430px] border-l border-slate-800/80 bg-slate-950/85 flex flex-col shrink-0 overflow-hidden">
+          <div id="graphSideHeader" class="p-3.5 border-b border-slate-800/80 bg-slate-950 space-y-2 shrink-0"></div>
+          <div id="graphSideMessages" class="flex-1 overflow-y-auto p-3.5 space-y-3"></div>
+        </div>
+
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 1: AGENT CARDS + INTER-AGENT MESSAGE STREAM                       -->
+      <!-- ===================================================================== -->
+      <div id="tabOverview" class="hidden flex-1 flex flex-col overflow-hidden">
+
+        <div class="p-4 border-b border-slate-800/80 bg-slate-950/30 shrink-0 max-h-[44%] overflow-y-auto">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Ajan Hiyerarşisi ve Seçilen Modeller</h3>
+              <span class="text-[11px] text-slate-400">(Bir ajana tıklayarak mesajlarını filtreleyebilir veya adımlarını inceleyebilirsiniz)</span>
+            </div>
+            <button id="clearAgentFilterBtn" onclick="selectAgentFilter(null)" class="hidden text-xs px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30">
+              ✕ Ajan Filtresini Temizle
+            </button>
+          </div>
+
+          <div id="agentNetworkGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"></div>
+        </div>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="px-5 py-2.5 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between gap-4 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm">💬</span>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Ajanlar Arası Görev Atamaları ve Mesajlaşma Akışı</h3>
+              <span id="messageCountLabel" class="text-[11px] mono px-2 py-0.5 rounded bg-slate-800 text-cyan-300">0 mesaj</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <input
+                type="text"
+                id="messageSearch"
+                oninput="renderMessages()"
+                placeholder="Mesaj içeriğinde ara..."
+                class="bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-56"
+              />
+            </div>
+          </div>
+
+          <div id="messageStream" class="flex-1 overflow-y-auto p-5 space-y-4"></div>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- TAB 2: DEEP-DIVE AGENT STEP & THINKING INSPECTOR                      -->
+      <!-- ===================================================================== -->
+      <div id="tabInspector" class="hidden flex-1 flex overflow-hidden">
+        <div id="inspectorAgentList" class="w-72 border-r border-slate-800/80 bg-slate-950/40 overflow-y-auto p-3 space-y-2 shrink-0"></div>
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div id="inspectorHeader" class="px-5 py-3 border-b border-slate-800/80 bg-slate-950/60 flex items-center justify-between shrink-0"></div>
+          <div id="inspectorSteps" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- MODAL: DEFINED AGENT PROFILES -->
+  <div id="profilesModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden select-text">
+      <div class="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-bold text-white">🤖 Sistemde Tanımlı Özel Ajan Profilleri (/root/.gemini/config/agents)</h3>
+          <p class="text-xs text-slate-400">Orkestratörün görev karmaşıklığına göre çağırabileceği uzman alt ajanlar</p>
+        </div>
+        <button onclick="closeProfilesModal()" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+      </div>
+      <div id="profilesModalBody" class="p-5 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+  </div>
+
+  <script>
+    let worldState = null;
+    let selectedSessionId = null;
+    let selectedAgentFilterId = null;
+    let inspectorAgentId = null;
+    let currentTab = 'graph';
+    let onlyRunningAgents = false;
+
+    // Interactive Graph State
+    let graphLayout = 'radial'; // 'radial' | 'tree'
+    let graphZoom = 1;
+    let graphPanX = 0;
+    let graphPanY = 0;
+    let isPanningGraph = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let draggedNodeId = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let nodePositions = new Map(); // sessionId:agentId -> { x, y }
+    let graphSelectedNodeId = null;
+    let graphSelectedEdgeKey = null;
+    let replayTimer = null;
+    let replayStepIndex = null; // null when not replaying, 0..messages.length when replaying
+    let replayPaused = false;
+    let replaySpeed = 1; // 0.5 | 1 | 2 | 4
+    let replayHighlightEdgeKey = null;
+    let messageCategoryFilter = 'ALL'; // 'ALL' | 'USER' | 'AGENT'
+    let graphExpanded = false;
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch (e) {
+        return iso;
+      }
+    }
+
+    function formatRelativeTime(ms) {
+      if (!ms) return '';
+      const diffSec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+      if (diffSec < 60) return `${diffSec} sn önce`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin} dk önce`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} sa önce`;
+      return `${Math.floor(diffHr / 24)} gün önce`;
+    }
+
+    function getModelColorHex(model) {
+      const m = (model || 'inherit').toLowerCase();
+      if (m.includes('pro') || m.includes('argon')) return { bg: '#3b0764', border: '#a855f7', text: '#e9d5ff', label: model };
+      if (m.includes('flash_lite')) return { bg: '#083344', border: '#06b6d4', text: '#a5f3fc', label: 'flash_lite' };
+      if (m.includes('flash')) return { bg: '#0c4a6e', border: '#38bdf8', text: '#bae6fd', label: 'flash' };
+      return { bg: '#451a03', border: '#f59e0b', text: '#fde68a', label: model || 'inherit' };
+    }
+
+    function getAgentIcon(typeName, isRoot) {
+      if (isRoot) return '👑';
+      const t = (typeName || '').toLowerCase();
+      if (t.includes('be')) return '⚙️';
+      if (t.includes('fe')) return '🎨';
+      if (t.includes('ml')) return '🧠';
+      if (t.includes('test')) return '🧪';
+      if (t.includes('review')) return '🛡️';
+      if (t.includes('research')) return '🔎';
+      return '🤖';
+    }
+
+    function getModelBadgeHtml(model) {
+      const m = (model || 'inherit').toLowerCase();
+      if (m.includes('pro') || m.includes('argon')) {
+        return `<span class="mono text-[10px] font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">⚡ ${escapeHtml(model)}</span>`;
+      }
+      if (m.includes('flash_lite')) {
+        return `<span class="mono text-[10px] font-semibold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">🚀 flash_lite</span>`;
+      }
+      if (m.includes('flash')) {
+        return `<span class="mono text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/40">⚡ flash</span>`;
+      }
+      return `<span class="mono text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">🔗 ${escapeHtml(model || 'inherit')}</span>`;
+    }
+
+    function getStatusBadgeHtml(status) {
+      if (status === 'running') {
+        return `<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>ÇALIŞIYOR</span>`;
+      }
+      if (status === 'waiting') {
+        return `<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">BEKLİYOR</span>`;
+      }
+      return `<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">TAMAMLANDI</span>`;
+    }
+
+    async function fetchWorldState() {
+      try {
+        const res = await fetch('/api/state');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        worldState = await res.json();
+
+        document.getElementById('statProjects').textContent = (worldState.projects || []).length;
+        const multiCount = (worldState.sessions || []).filter((s) => s.isMultiAgent).length;
+        document.getElementById('statMultiSessions').textContent = multiCount;
+        document.getElementById('statProfiles').textContent = (worldState.agentProfiles || []).length;
+        document.getElementById('liveDot').className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        document.getElementById('syncLabel').textContent = 'Canlı (' + formatTime(worldState.serverTime) + ')';
+
+        populateProjectDropdown();
+        renderSessionList();
+
+        const filtered = getFilteredSessions();
+        if (!selectedSessionId || !worldState.sessions.some((s) => s.id === selectedSessionId)) {
+          if (filtered.length > 0) {
+            selectedSessionId = filtered[0].id;
+          } else if (worldState.sessions.length > 0) {
+            selectedSessionId = worldState.sessions[0].id;
+          }
+        }
+
+        renderActiveSession();
+      } catch (err) {
+        document.getElementById('liveDot').className = 'w-2 h-2 rounded-full bg-rose-500';
+        document.getElementById('syncLabel').textContent = 'Bağlantı bekleniyor...';
+      }
+    }
+
+    function populateProjectDropdown() {
+      const sel = document.getElementById('projectSelect');
+      const currentVal = sel.value || 'ALL';
+      const projects = worldState.projects || [];
+      let html = `<option value="ALL">📁 Tüm Projeler (${(worldState.sessions || []).length} oturum)</option>`;
+      for (const p of projects) {
+        const multiTag = p.multiAgentCount > 0 ? ` [${p.multiAgentCount} Multi-Agent]` : '';
+        html += `<option value="${escapeHtml(p.name)}">📂 ${escapeHtml(p.name)} (${p.sessionCount}${multiTag})</option>`;
+      }
+      sel.innerHTML = html;
+      if ([...sel.options].some((o) => o.value === currentVal)) {
+        sel.value = currentVal;
+      }
+    }
+
+    function getFilteredSessions() {
+      if (!worldState || !worldState.sessions) return [];
+      const proj = document.getElementById('projectSelect').value;
+      const onlyMulti = document.getElementById('onlyMultiAgentToggle').checked;
+      const onlyActiveSess = document.getElementById('onlyActiveSessionsToggle')?.checked;
+      const q = (document.getElementById('sessionSearch').value || '').toLowerCase().trim();
+
+      return worldState.sessions.filter((s) => {
+        if (proj !== 'ALL' && s.project !== proj) return false;
+        if (onlyMulti && !s.isMultiAgent) return false;
+        if (onlyActiveSess && s.status !== 'running') return false;
+        if (q) {
+          const hay = `${s.title} ${s.project} ${s.id} ${(s.agents || []).map((a) => a.role + ' ' + a.typeName).join(' ')}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+    }
+
+    function toggleOnlyRunningAgents() {
+      onlyRunningAgents = !onlyRunningAgents;
+      const btn = document.getElementById('onlyRunningAgentsBtn');
+      const track = document.getElementById('onlyRunningSwitchTrack');
+      const knob = document.getElementById('onlyRunningSwitchKnob');
+
+      if (onlyRunningAgents) {
+        btn.className = 'px-3 py-1.5 rounded-lg border border-emerald-500/60 bg-emerald-950/40 text-xs font-semibold text-emerald-300 transition flex items-center gap-2 shadow-lg shadow-emerald-950/30';
+        track.className = 'w-7 h-4 rounded-full bg-emerald-500 relative transition flex items-center p-0.5';
+        knob.className = 'w-3 h-3 rounded-full bg-white transform translate-x-3 transition';
+      } else {
+        btn.className = 'px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs font-medium text-slate-300 transition flex items-center gap-2';
+        track.className = 'w-7 h-4 rounded-full bg-slate-700 relative transition flex items-center p-0.5';
+        knob.className = 'w-3 h-3 rounded-full bg-slate-300 transform transition';
+      }
+
+      const s = getCurrentSession();
+      if (s) {
+        for (const a of s.agents || []) {
+          nodePositions.delete(`${s.id}:${a.id}`);
+        }
+      }
+      renderActiveSession();
+    }
+
+    function getVisibleAgentsForSession(session) {
+      const all = session.agents || [];
+      if (!onlyRunningAgents) return all;
+      // Keep Root Orchestrator + any agent with status === 'running' or 'waiting'
+      return all.filter((a) => a.isRoot || a.status === 'running' || a.status === 'waiting');
+    }
+
+    function onFilterChange() {
+      const filtered = getFilteredSessions();
+      if (filtered.length > 0 && !filtered.some((s) => s.id === selectedSessionId)) {
+        selectedSessionId = filtered[0].id;
+        selectedAgentFilterId = null;
+        graphSelectedNodeId = null;
+        graphSelectedEdgeKey = null;
+      }
+      renderSessionList();
+      renderActiveSession();
+    }
+
+    function selectSession(id) {
+      stopGraphReplay();
+      selectedSessionId = id;
+      selectedAgentFilterId = null;
+      inspectorAgentId = null;
+      graphSelectedNodeId = null;
+      graphSelectedEdgeKey = null;
+      resetGraphTransform(false);
+      renderSessionList();
+      renderActiveSession();
+    }
+
+    function renderSessionList() {
+      const listEl = document.getElementById('sessionList');
+      const filtered = getFilteredSessions();
+      document.getElementById('sessionCountBadge').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="p-6 text-center text-xs text-slate-400 space-y-2">
+            <p>Bu filtreye uygun oturum bulunamadı.</p>
+            <button onclick="document.getElementById('onlyMultiAgentToggle').checked=false; onFilterChange();" class="px-3 py-1.5 rounded bg-slate-800 text-indigo-300 hover:bg-slate-700">
+              Tek Ajanlı Oturumları da Göster
+            </button>
+          </div>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered
+        .map((s) => {
+          const isSelected = s.id === selectedSessionId;
+          const activeClass = isSelected
+            ? 'bg-indigo-950/50 border-l-4 border-l-indigo-500'
+            : 'hover:bg-slate-900/70 border-l-4 border-l-transparent';
+
+          return `
+            <div onclick="selectSession('${s.id}')" class="p-3 cursor-pointer transition ${activeClass}">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 truncate max-w-[140px]">
+                  📂 ${escapeHtml(s.project)}
+                </span>
+                <span class="text-[10px] text-slate-400 mono">${formatRelativeTime(s.mtimeMs)}</span>
+              </div>
+              <div class="text-xs font-medium text-slate-100 line-clamp-2 mb-2">${escapeHtml(s.title)}</div>
+              <div class="flex items-center justify-between text-[11px]">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-1.5 py-0.5 rounded ${s.isMultiAgent ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold' : 'bg-slate-800 text-slate-400'}">
+                    👥 ${s.agentCount} Ajan
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded bg-slate-800 text-cyan-300">
+                    💬 ${s.messageCount} Mesaj
+                  </span>
+                </div>
+                <span class="mono text-[10px] text-slate-500">#${s.id.slice(0, 6)}</span>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function getCurrentSession() {
+      if (!worldState || !worldState.sessions) return null;
+      return worldState.sessions.find((s) => s.id === selectedSessionId) || null;
+    }
+
+    function setMainTab(tab) {
+      currentTab = tab;
+      const tabs = ['graph', 'overview', 'inspector'];
+      const btnMap = {
+        graph: document.getElementById('tabBtnGraph'),
+        overview: document.getElementById('tabBtnOverview'),
+        inspector: document.getElementById('tabBtnInspector')
+      };
+      const panelMap = {
+        graph: document.getElementById('tabGraph'),
+        overview: document.getElementById('tabOverview'),
+        inspector: document.getElementById('tabInspector')
+      };
+
+      for (const t of tabs) {
+        if (t === tab) {
+          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium bg-indigo-600 text-white transition';
+          panelMap[t].classList.remove('hidden');
+        } else {
+          btnMap[t].className = 'px-3 py-1.5 rounded-md font-medium text-slate-400 hover:text-white transition';
+          panelMap[t].classList.add('hidden');
+        }
+      }
+
+      renderActiveSession();
+    }
+
+    function selectAgentFilter(agentId) {
+      if (selectedAgentFilterId === agentId) {
+        selectedAgentFilterId = null;
+      } else {
+        selectedAgentFilterId = agentId;
+      }
+      renderActiveSession();
+    }
+
+    function inspectAgentSteps(agentId, event) {
+      if (event) event.stopPropagation();
+      inspectorAgentId = agentId;
+      setMainTab('inspector');
+    }
+
+    function renderActiveSession() {
+      const s = getCurrentSession();
+      if (!s) return;
+
+      document.getElementById('activeProjectBadge').textContent = `📂 ${s.project}`;
+      document.getElementById('activeSessionId').textContent = `ID: ${s.id}`;
+      document.getElementById('activeSessionStatus').innerHTML = getStatusBadgeHtml(s.status);
+      document.getElementById('activeSessionTitle').textContent = s.title;
+
+      const runningCount = (s.agents || []).filter((a) => a.status === 'running' || a.status === 'waiting').length;
+      const pill = document.getElementById('runningAgentCountPill');
+      if (pill) {
+        pill.textContent = `${runningCount}/${(s.agents || []).length}`;
+      }
+
+      const clearBtn = document.getElementById('clearAgentFilterBtn');
+      if (selectedAgentFilterId) {
+        clearBtn.classList.remove('hidden');
+      } else {
+        clearBtn.classList.add('hidden');
+      }
+
+      if (currentTab === 'graph') {
+        renderInteractiveGraph(s);
+      } else if (currentTab === 'overview') {
+        renderAgentNetwork(s);
+        renderMessages(s);
+      } else if (currentTab === 'inspector') {
+        renderInspectorTab();
+      }
+    }
+
+    // =========================================================================
+    // INTERACTIVE GRAPH MODULE
+    // =========================================================================
+
+    function setGraphLayout(layout) {
+      graphLayout = layout;
+      const btnRadial = document.getElementById('layoutBtnRadial');
+      const btnTree = document.getElementById('layoutBtnTree');
+      if (layout === 'radial') {
+        btnRadial.className = 'text-xs px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium transition';
+        btnTree.className = 'text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition';
+      } else {
+        btnTree.className = 'text-xs px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-medium transition';
+        btnRadial.className = 'text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition';
+      }
+      // Clear cached positions for current session so new layout computes cleanly
+      const s = getCurrentSession();
+      if (s) {
+        nodePositions.delete(`${s.id}:USER`);
+        for (const a of s.agents || []) {
+          nodePositions.delete(`${s.id}:${a.id}`);
+        }
+      }
+      resetGraphTransform();
+    }
+
+    function computeNodeCoordinates(session) {
+      const svg = document.getElementById('agentGraphSvg');
+      const rect = svg.getBoundingClientRect();
+      const width = rect.width || 950;
+      const height = rect.height || 660;
+      const cx = width / 2;
+      const cy = height / 2;
+
+      const agents = session.agents || [];
+      const root = agents.find((a) => a.isRoot) || agents[0];
+      const coords = new Map();
+      if (!root) return coords;
+
+      const rootKey = `${session.id}:${root.id}`;
+      if (!nodePositions.has(rootKey)) {
+        if (graphLayout === 'radial') {
+          nodePositions.set(rootKey, { x: cx, y: cy + 35 });
+        } else {
+          nodePositions.set(rootKey, { x: cx, y: 235 });
+        }
+      }
+      const rootPos = nodePositions.get(rootKey);
+      coords.set(root.id, rootPos);
+
+      // Position USER node directly above Root Orchestrator (equal X!)
+      const userKey = `${session.id}:USER`;
+      if (!nodePositions.has(userKey)) {
+        if (graphLayout === 'radial') {
+          nodePositions.set(userKey, { x: rootPos.x, y: rootPos.y - 165 });
+        } else {
+          nodePositions.set(userKey, { x: rootPos.x, y: 75 });
+        }
+      }
+      coords.set('USER', nodePositions.get(userKey));
+
+      // Group descendants by depth level (1 = subagent, 2 = sub-subagent, 3 = ...)
+      const byDepth = new Map();
+      let maxDepth = 0;
+      for (const a of agents) {
+        if (a.id === root.id) continue;
+        const d = a.depth || 1;
+        if (d > maxDepth) maxDepth = d;
+        if (!byDepth.has(d)) byDepth.set(d, []);
+        byDepth.get(d).push(a);
+      }
+
+      if (maxDepth === 0) return coords;
+
+      const angleOf = new Map([[root.id, Math.PI / 2]]);
+      const d1Count = (byDepth.get(1) || []).length;
+      const baseRadius = Math.max(225, Math.min(width, height) * 0.34, d1Count * 36);
+
+      const newlyPlacedKeys = [];
+
+      for (let d = 1; d <= maxDepth; d++) {
+        const levelAgents = byDepth.get(d) || [];
+        const count = levelAgents.length;
+        if (count === 0) continue;
+
+        if (graphLayout === 'radial') {
+          const ringRadius = baseRadius + (d - 1) * 180;
+          if (d === 1) {
+            // Leave top corridor (-PI/2) open for USER node! Distribute across the lower/side arc:
+            const topGap = 0.68; // radians (~39 deg each side of 12 o'clock)
+            const startAngle = -Math.PI / 2 + topGap;
+            const endAngle = (3 * Math.PI) / 2 - topGap;
+            const totalArc = endAngle - startAngle;
+
+            levelAgents.forEach((ag, idx) => {
+              const angle =
+                count === 1
+                  ? Math.PI / 2
+                  : startAngle + (totalArc * idx) / (count - 1);
+              angleOf.set(ag.id, angle);
+              const key = `${session.id}:${ag.id}`;
+              if (!nodePositions.has(key)) {
+                nodePositions.set(key, {
+                  x: rootPos.x + ringRadius * Math.cos(angle),
+                  y: rootPos.y + ringRadius * Math.sin(angle)
+                });
+                newlyPlacedKeys.push(key);
+              }
+              coords.set(ag.id, nodePositions.get(key));
+            });
+          } else {
+            // Sub-subagents (depth >= 2): fan out around their parent's angle
+            const byParent = new Map();
+            for (const ag of levelAgents) {
+              const pid = ag.parentId || root.id;
+              if (!byParent.has(pid)) byParent.set(pid, []);
+              byParent.get(pid).push(ag);
+            }
+            for (const [pid, siblings] of byParent.entries()) {
+              const pAngle = angleOf.get(pid) ?? Math.PI / 2;
+              const spread = Math.min(Math.PI / 2.2, siblings.length * 0.38);
+              siblings.forEach((ag, sIdx) => {
+                const offset = siblings.length === 1 ? 0 : -spread / 2 + (spread * sIdx) / (siblings.length - 1);
+                const angle = pAngle + offset;
+                angleOf.set(ag.id, angle);
+                const key = `${session.id}:${ag.id}`;
+                if (!nodePositions.has(key)) {
+                  nodePositions.set(key, {
+                    x: rootPos.x + ringRadius * Math.cos(angle),
+                    y: rootPos.y + ringRadius * Math.sin(angle)
+                  });
+                  newlyPlacedKeys.push(key);
+                }
+                coords.set(ag.id, nodePositions.get(key));
+              });
+            }
+          }
+        } else {
+          // Hierarchical tree layout by depth
+          levelAgents.sort((a, b) => {
+            const pa = coords.get(a.parentId)?.x ?? cx;
+            const pb = coords.get(b.parentId)?.x ?? cx;
+            return pa - pb;
+          });
+          const cols = Math.min(count, 4);
+          levelAgents.forEach((ag, idx) => {
+            const key = `${session.id}:${ag.id}`;
+            if (!nodePositions.has(key)) {
+              const row = Math.floor(idx / cols);
+              const col = idx % cols;
+              const colsInRow = Math.min(cols, count - row * cols);
+              const spacingX = Math.max(230, Math.min(260, (width - 80) / Math.max(1, colsInRow)));
+              const startX = cx - ((colsInRow - 1) * spacingX) / 2;
+              nodePositions.set(key, {
+                x: startX + col * spacingX,
+                y: 235 + d * 170 + row * 135
+              });
+              newlyPlacedKeys.push(key);
+            }
+            coords.set(ag.id, nodePositions.get(key));
+          });
+        }
+      }
+
+      // Collision resolution pass so no two cards overlap
+      if (newlyPlacedKeys.length > 0) {
+        const allIds = ['USER', ...agents.map((a) => a.id)];
+        const minW = 224;
+        const minH = 114;
+        for (let iter = 0; iter < 25; iter++) {
+          let moved = false;
+          for (let i = 0; i < allIds.length; i++) {
+            for (let j = i + 1; j < allIds.length; j++) {
+              const idA = allIds[i];
+              const idB = allIds[j];
+              const pA = coords.get(idA);
+              const pB = coords.get(idB);
+              if (!pA || !pB) continue;
+
+              const dx = pB.x - pA.x;
+              const dy = pB.y - pA.y;
+              if (Math.abs(dx) < minW && Math.abs(dy) < minH) {
+                const overlapX = minW - Math.abs(dx);
+                const overlapY = minH - Math.abs(dy);
+                const lockA = idA === 'USER' || idA === root.id;
+                const lockB = idB === 'USER' || idB === root.id;
+                if (lockA && lockB) continue;
+
+                const sx = dx >= 0 ? 1 : -1;
+                const sy = dy >= 0 ? 1 : -1;
+
+                if (overlapX < overlapY) {
+                  const shift = overlapX / (lockA || lockB ? 1 : 2) + 2;
+                  if (!lockA) pA.x -= sx * shift;
+                  if (!lockB) pB.x += sx * shift;
+                } else {
+                  const shift = overlapY / (lockA || lockB ? 1 : 2) + 2;
+                  if (!lockA) pA.y -= sy * shift;
+                  if (!lockB) pB.y += sy * shift;
+                }
+                moved = true;
+              }
+            }
+          }
+          if (!moved) break;
+        }
+      }
+
+      return coords;
+    }
+
+    /**
+     * Computes each agent's lifecycle state during Replay ('active' | 'fading' | 'unborn' | 'gone')
+     * or returns null when not in Replay mode.
+     */
+    function computeReplayLifecycleMap(session) {
+      if (replayStepIndex === null) return null;
+      const msgs = session.messages || [];
+      const lifecycle = new Map();
+
+      for (const a of session.agents || []) {
+        if (a.isRoot) {
+          lifecycle.set(a.id, 'active');
+          continue;
+        }
+        // Find first TASK_DELEGATION to this agent
+        let spawnIdx = msgs.findIndex((m) => m.kind === 'TASK_DELEGATION' && m.recipient.id === a.id);
+        if (spawnIdx === -1) {
+          // Fallback: first message involving this agent
+          spawnIdx = msgs.findIndex((m) => m.sender.id === a.id || m.recipient.id === a.id);
+        }
+        if (spawnIdx === -1) spawnIdx = 0;
+
+        // Find last AGENT_MESSAGE sent by this subagent (its completion report)
+        let finishIdx = -1;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i].kind === 'AGENT_MESSAGE' && msgs[i].sender.id === a.id) {
+            finishIdx = i;
+            break;
+          }
+        }
+
+        if (replayStepIndex < spawnIdx) {
+          lifecycle.set(a.id, 'unborn'); // Henüz aktif olmadı -> gösterilmez
+        } else if (finishIdx !== -1 && replayStepIndex === finishIdx) {
+          lifecycle.set(a.id, 'fading'); // İşini yeni bitirdi -> silik gözükür
+        } else if (finishIdx !== -1 && replayStepIndex > finishIdx) {
+          lifecycle.set(a.id, 'gone'); // Bir sonraki adımda kaybolur
+        } else {
+          lifecycle.set(a.id, 'active'); // Aktif çalışıyor
+        }
+      }
+      return lifecycle;
+    }
+
+    function applyViewportTransform() {
+      const vp = document.getElementById('graphViewport');
+      if (vp) {
+        vp.setAttribute('transform', `translate(${graphPanX}, ${graphPanY}) scale(${graphZoom})`);
+      }
+    }
+
+    function zoomGraph(factor) {
+      graphZoom = Math.min(2.4, Math.max(0.45, graphZoom * factor));
+      applyViewportTransform();
+    }
+
+    function resetGraphTransform(rerender = true) {
+      graphZoom = 1;
+      graphPanX = 0;
+      graphPanY = 0;
+      applyViewportTransform();
+      if (rerender) {
+        const s = getCurrentSession();
+        if (s) renderInteractiveGraph(s);
+      }
+    }
+
+    function onGraphWheel(e) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      zoomGraph(factor);
+    }
+
+    function onGraphMouseDown(e) {
+      if (e.target.closest('.graph-node-group') || e.target.closest('.graph-edge-hit')) {
+        return;
+      }
+      isPanningGraph = true;
+      panStartX = e.clientX - graphPanX;
+      panStartY = e.clientY - graphPanY;
+    }
+
+    function onNodeMouseDown(e, agentId) {
+      e.stopPropagation();
+      const s = getCurrentSession();
+      if (!s) return;
+      draggedNodeId = agentId;
+      const pos = nodePositions.get(`${s.id}:${agentId}`) || { x: 0, y: 0 };
+      dragOffsetX = (e.clientX - graphPanX) / graphZoom - pos.x;
+      dragOffsetY = (e.clientY - graphPanY) / graphZoom - pos.y;
+
+      graphSelectedNodeId = agentId;
+      graphSelectedEdgeKey = null;
+      renderInteractiveGraph(s);
+    }
+
+    function onGraphMouseMove(e) {
+      const s = getCurrentSession();
+      if (draggedNodeId && s) {
+        const nx = (e.clientX - graphPanX) / graphZoom - dragOffsetX;
+        const ny = (e.clientY - graphPanY) / graphZoom - dragOffsetY;
+        nodePositions.set(`${s.id}:${draggedNodeId}`, { x: nx, y: ny });
+        renderInteractiveGraph(s);
+        return;
+      }
+      if (isPanningGraph) {
+        graphPanX = e.clientX - panStartX;
+        graphPanY = e.clientY - panStartY;
+        applyViewportTransform();
+      }
+    }
+
+    function onGraphMouseUp() {
+      draggedNodeId = null;
+      isPanningGraph = false;
+    }
+
+    function selectGraphEdge(edgeKey, e) {
+      if (e) e.stopPropagation();
+      graphSelectedEdgeKey = edgeKey === graphSelectedEdgeKey ? null : edgeKey;
+      graphSelectedNodeId = null;
+      const s = getCurrentSession();
+      if (s) renderInteractiveGraph(s);
+    }
+
+    function renderInteractiveGraph(session) {
+      const coords = computeNodeCoordinates(session);
+      const edgesLayer = document.getElementById('graphEdgesLayer');
+      const particlesLayer = document.getElementById('graphParticlesLayer');
+      const nodesLayer = document.getElementById('graphNodesLayer');
+
+      const replayLifecycle = computeReplayLifecycleMap(session);
+
+      let agents = getVisibleAgentsForSession(session);
+      if (replayLifecycle) {
+        // During replay: hide 'unborn' (not started yet) and 'gone' (already faded out) agents
+        agents = (session.agents || []).filter((a) => {
+          const st = replayLifecycle.get(a.id);
+          return st === 'active' || st === 'fading';
+        });
+      }
+
+      const visibleIds = new Set(agents.map((a) => a.id));
+      visibleIds.add('USER');
+
+      const allSessionMsgs = session.messages || [];
+      const messages = allSessionMsgs.filter((m, idx) => {
+        if (!visibleIds.has(m.sender.id) || !visibleIds.has(m.recipient.id)) return false;
+        if (replayStepIndex !== null && idx > replayStepIndex) return false;
+        return true;
+      });
+
+      // Prepend virtual USER node to render on the graph canvas
+      const userPromptCount = allSessionMsgs.filter((m) => m.kind === 'USER_PROMPT').length;
+      const currentReplayMsg =
+        replayStepIndex !== null && replayStepIndex < allSessionMsgs.length ? allSessionMsgs[replayStepIndex] : null;
+      const isUserStepActive = Boolean(
+        currentReplayMsg && (currentReplayMsg.kind === 'USER_PROMPT' || currentReplayMsg.kind === 'AGENT_TO_USER')
+      );
+
+      const nodesToRender = [
+        {
+          id: 'USER',
+          isUser: true,
+          isRoot: false,
+          depth: 0,
+          role: 'Kullanıcı (User)',
+          typeName: 'user',
+          model: 'Human',
+          workspace: 'Host Browser / CLI',
+          status: isUserStepActive ? 'running' : 'completed',
+          stepCount: userPromptCount,
+          lastActionSummary: 'Kullanıcı istekleri ve yanıtları'
+        },
+        ...agents
+      ];
+
+      // Group directed edges by (senderId -> recipientId, kind)
+      const edgeMap = new Map();
+      for (const m of messages) {
+        const key = `${m.sender.id}->${m.recipient.id}:${m.kind}`;
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, {
+            key,
+            from: m.sender.id,
+            to: m.recipient.id,
+            kind: m.kind,
+            model: m.model,
+            count: 0,
+            messages: []
+          });
+        }
+        const entry = edgeMap.get(key);
+        entry.count += 1;
+        entry.messages.push(m);
+      }
+
+      // Also ensure every subagent has at least a structural link from its parent
+      for (const a of agents) {
+        if (!a.isRoot && a.parentId) {
+          const key = `${a.parentId}->${a.id}:TASK_DELEGATION`;
+          if (!edgeMap.has(key)) {
+            edgeMap.set(key, {
+              key,
+              from: a.parentId,
+              to: a.id,
+              kind: 'TASK_DELEGATION',
+              model: a.model,
+              count: 1,
+              messages: []
+            });
+          }
+        }
+      }
+
+      let edgesSvg = '';
+      let particlesSvg = '';
+
+      for (const edge of edgeMap.values()) {
+        const p1 = coords.get(edge.from);
+        const p2 = coords.get(edge.to);
+        if (!p1 || !p2) continue;
+
+        const isTask = edge.kind === 'TASK_DELEGATION';
+        const isUserPrompt = edge.kind === 'USER_PROMPT';
+        const isAgentReply = edge.kind === 'AGENT_TO_USER';
+        const isOutward = isTask || isUserPrompt;
+
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        const startOffset = 58;
+        const endOffset = 68;
+        const ratioStart = Math.min(0.35, startOffset / dist);
+        const ratioEnd = Math.min(0.35, endOffset / dist);
+
+        const nx = -dy / dist;
+        const ny = dx / dist;
+        const curveShift = 22;
+
+        const sx = p1.x + dx * ratioStart + nx * 10;
+        const sy = p1.y + dy * ratioStart + ny * 10;
+        const ex = p2.x - dx * ratioEnd + nx * 10;
+        const ey = p2.y - dy * ratioEnd + ny * 10;
+
+        const cx = (sx + ex) / 2 + nx * curveShift;
+        const cy = (sy + ey) / 2 + ny * curveShift;
+
+        const pathD = `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+        const pathId = `edge-path-${edge.key.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+
+        const isHighlighted =
+          replayHighlightEdgeKey === edge.key ||
+          graphSelectedEdgeKey === edge.key ||
+          (graphSelectedNodeId && (edge.from === graphSelectedNodeId || edge.to === graphSelectedNodeId));
+
+        let strokeColor = '#34d399';
+        let marker = 'url(#arrow-msg)';
+        let labelText = `💬 ${edge.count} Rapor`;
+        let labelColor = '#a7f3d0';
+        let particleColor = '#6ee7b7';
+
+        if (isUserPrompt) {
+          strokeColor = '#38bdf8';
+          marker = 'url(#arrow-user)';
+          labelText = `👤 ${edge.count} İstek`;
+          labelColor = '#bae6fd';
+          particleColor = '#7dd3fc';
+        } else if (isAgentReply) {
+          strokeColor = '#c084fc';
+          marker = 'url(#arrow-reply)';
+          labelText = `💬 ${edge.count} Yanıt`;
+          labelColor = '#e9d5ff';
+          particleColor = '#d8b4fe';
+        } else if (isTask) {
+          strokeColor = '#818cf8';
+          marker = 'url(#arrow-task)';
+          labelText = `Görev (${edge.model || 'inherit'})`;
+          labelColor = '#c7d2fe';
+          particleColor = '#a5b4fc';
+        }
+
+        const strokeOpacity =
+          graphSelectedNodeId || graphSelectedEdgeKey || replayHighlightEdgeKey
+            ? isHighlighted
+              ? '1'
+              : '0.22'
+            : '0.82';
+        const strokeWidth = isHighlighted ? 3.2 : 2;
+
+        const mx = 0.25 * sx + 0.5 * cx + 0.25 * ex;
+        const my = 0.25 * sy + 0.5 * cy + 0.25 * ey;
+
+        edgesSvg += `
+          <g class="graph-edge-hit cursor-pointer" onclick="selectGraphEdge('${edge.key}', event)" opacity="${strokeOpacity}">
+            <path id="${pathId}" d="${pathD}" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" marker-end="${marker}" class="edge-animated" />
+            <path d="${pathD}" fill="none" stroke="transparent" stroke-width="16" />
+            <g transform="translate(${mx.toFixed(1)}, ${my.toFixed(1)})">
+              <rect x="-46" y="-10" width="92" height="20" rx="10" fill="#0f172a" stroke="${strokeColor}" stroke-width="1" />
+              <text x="0" y="3.5" text-anchor="middle" fill="${labelColor}" font-size="9.5" font-weight="600" class="mono">
+                ${escapeHtml(labelText)}
+              </text>
+            </g>
+          </g>
+        `;
+
+        if (isHighlighted || session.status === 'running') {
+          particlesSvg += `
+            <circle r="4.5" fill="${particleColor}" filter="url(#glow-indigo)">
+              <animateMotion dur="${isOutward ? '2.0s' : '1.7s'}" repeatCount="indefinite">
+                <mpath href="#${pathId}" />
+              </animateMotion>
+            </circle>
+          `;
+        }
+      }
+
+      edgesLayer.innerHTML = edgesSvg;
+      particlesLayer.innerHTML = particlesSvg;
+
+      // Render User + Agent Nodes
+      let nodesSvg = '';
+      nodesToRender.forEach((a, idx) => {
+        const pos = coords.get(a.id) || { x: 400, y: 300 };
+        const isSelected = graphSelectedNodeId === a.id;
+        const mColor = a.isUser
+          ? { bg: '#082f49', border: '#38bdf8', text: '#bae6fd', label: 'KULLANICI' }
+          : getModelColorHex(a.model);
+        const icon = a.isUser ? '👤' : getAgentIcon(a.typeName, a.isRoot);
+
+        const replayNodeState = replayLifecycle ? replayLifecycle.get(a.id) : null;
+        const isFading = replayNodeState === 'fading';
+        const isReplayingActive = a.isUser ? isUserStepActive : replayNodeState === 'active' && !a.isRoot;
+        const effectiveRunning = replayLifecycle ? isReplayingActive : a.status === 'running';
+
+        const cardW = a.isRoot ? 210 : a.isUser ? 190 : 198;
+        const cardH = a.isRoot ? 92 : 88;
+        const halfW = cardW / 2;
+        const halfH = cardH / 2;
+
+        const borderColor = isSelected
+          ? '#38bdf8'
+          : isFading
+          ? '#475569'
+          : effectiveRunning
+          ? a.isUser
+            ? '#38bdf8'
+            : '#10b981'
+          : a.isUser
+          ? '#0284c7'
+          : a.isRoot
+          ? '#6366f1'
+          : '#334155';
+        const strokeW = isSelected ? 3 : a.isRoot || a.isUser ? 2.2 : 1.5;
+        const bgFill = a.isUser ? '#0c233a' : a.isRoot ? '#1e1b4b' : '#0f172a';
+        const nodeOpacity = isFading ? '0.32' : '1';
+        const strokeDash = isFading ? 'stroke-dasharray="5 4"' : '';
+
+        const roleShort = a.role.length > 26 ? a.role.slice(0, 25) + '…' : a.role;
+        const statusDotColor = isFading ? '#f59e0b' : effectiveRunning ? (a.isUser ? '#38bdf8' : '#10b981') : '#64748b';
+        const depthLevel = a.depth || (a.isRoot ? 0 : 1);
+        const levelTag = a.isUser
+          ? 'KULLANICI (PROMPT)'
+          : a.isRoot
+          ? 'ANA ORKESTRATÖR'
+          : depthLevel > 1
+          ? `L${depthLevel} ALT-ALT (${a.typeName.toUpperCase()})`
+          : `L1 ${a.typeName.toUpperCase()}`;
+
+        nodesSvg += `
+          <g
+            class="graph-node-group cursor-pointer transition-opacity duration-500"
+            opacity="${nodeOpacity}"
+            transform="translate(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)})"
+            onmousedown="onNodeMouseDown(event, '${a.id}')"
+          >
+            ${
+              (effectiveRunning || isSelected) && !isFading
+                ? `<rect x="${-halfW - 5}" y="${-halfH - 5}" width="${cardW + 10}" height="${cardH + 10}" rx="16" fill="none" stroke="${
+                    isSelected || a.isUser ? '#38bdf8' : '#10b981'
+                  }" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.85" />`
+                : ''
+            }
+            <rect
+              x="${-halfW}"
+              y="${-halfH}"
+              width="${cardW}"
+              height="${cardH}"
+              rx="13"
+              fill="${bgFill}"
+              stroke="${borderColor}"
+              stroke-width="${strokeW}"
+              ${strokeDash}
+            />
+
+            <!-- Top Row: Icon + Level/Type + Status Dot -->
+            <text x="${-halfW + 12}" y="${-halfH + 20}" font-size="13">${icon}</text>
+            <text x="${-halfW + 30}" y="${-halfH + 19}" fill="${a.isUser ? '#7dd3fc' : a.isRoot ? '#a5b4fc' : depthLevel > 1 ? '#f0abfc' : '#94a3b8'}" font-size="9" font-weight="700" class="mono">
+              ${escapeHtml(levelTag.slice(0, 22))}
+            </text>
+            <circle cx="${halfW - 14}" cy="${-halfH + 15}" r="4.5" fill="${statusDotColor}" />
+
+            <!-- Role Title -->
+            <text x="${-halfW + 12}" y="${-halfH + 41}" fill="#f8fafc" font-size="11" font-weight="700">
+              ${escapeHtml(roleShort)}
+            </text>
+
+            <!-- Bottom Row: Model Pill + Step Count / Fading Label -->
+            <g transform="translate(${-halfW + 12}, ${halfH - 26})">
+              <rect x="0" y="0" width="84" height="17" rx="5" fill="${mColor.bg}" stroke="${mColor.border}" stroke-width="1" />
+              <text x="42" y="11.5" text-anchor="middle" fill="${mColor.text}" font-size="9.5" font-weight="600" class="mono">
+                ${escapeHtml(mColor.label.slice(0, 12))}
+              </text>
+            </g>
+
+            <text x="${halfW - 12}" y="${halfH - 14}" text-anchor="end" fill="${isFading ? '#fbbf24' : '#cbd5e1'}" font-size="9.5" font-weight="${isFading ? '700' : '400'}" class="mono">
+              ${isFading ? '✓ Bitti (Kapanıyor)' : a.isUser ? `${a.stepCount} istek` : `${a.stepCount} adım`}
+            </text>
+          </g>
+        `;
+      });
+
+      nodesLayer.innerHTML = nodesSvg;
+      applyViewportTransform();
+      renderGraphSidePanel(session);
+    }
+
+    function toggleGraphHeight() {
+      graphExpanded = !graphExpanded;
+      const container = document.getElementById('graphTopContainer');
+      if (graphExpanded) {
+        container.className = 'h-[72%] min-h-[260px] border-b border-slate-800/90 relative overflow-hidden graph-bg-grid flex flex-col shrink-0 transition-all';
+      } else {
+        container.className = 'h-[52%] min-h-[260px] border-b border-slate-800/90 relative overflow-hidden graph-bg-grid flex flex-col shrink-0 transition-all';
+      }
+      setTimeout(() => {
+        const s = getCurrentSession();
+        if (s) renderInteractiveGraph(s);
+      }, 150);
+    }
+
+    function setMessageCategoryFilter(cat) {
+      messageCategoryFilter = cat;
+      const s = getCurrentSession();
+      if (s) {
+        renderGraphSidePanel(s);
+        renderMessages(s);
+      }
+    }
+
+    function getMessageBadgeMeta(m) {
+      if (m.kind === 'USER_PROMPT') {
+        return {
+          tag: '👤 KULLANICI İSTEĞİ (PROMPT)',
+          tagCls: 'text-sky-300 bg-sky-500/20 border border-sky-500/40',
+          borderCls: 'border-sky-500/40 bg-sky-950/20'
+        };
+      }
+      if (m.kind === 'AGENT_TO_USER') {
+        return {
+          tag: '💬 AJANIN KULLANICIYA YANITI',
+          tagCls: 'text-purple-300 bg-purple-500/20 border border-purple-500/40',
+          borderCls: 'border-purple-500/40 bg-purple-950/20'
+        };
+      }
+      if (m.kind === 'TASK_DELEGATION') {
+        return {
+          tag: '📤 GÖREV ATAMASI (invoke_subagent)',
+          tagCls: 'text-indigo-300 bg-indigo-500/20 border border-indigo-500/40',
+          borderCls: 'border-indigo-500/40 bg-indigo-950/20'
+        };
+      }
+      return {
+        tag: '📩 ALT AJAN RAPORU / MESAJI (send_message)',
+        tagCls: 'text-emerald-300 bg-emerald-500/20 border border-emerald-500/40',
+        borderCls: 'border-emerald-500/40 bg-emerald-950/15'
+      };
+    }
+
+    function renderGraphSidePanel(session) {
+      const headerEl = document.getElementById('graphSideHeader');
+      const bodyEl = document.getElementById('graphSideMessages');
+      const agents = session.agents || [];
+      const rawMsgs = session.messages || [];
+
+      // If Replay is active, only show messages up to replayStepIndex!
+      let allMsgs = rawMsgs
+        .map((m, origIdx) => ({ ...m, _origIdx: origIdx }))
+        .filter((m) => replayStepIndex === null || m._origIdx <= replayStepIndex);
+
+      // Category filter ('ALL' | 'USER' | 'AGENT')
+      if (messageCategoryFilter === 'USER') {
+        allMsgs = allMsgs.filter((m) => m.kind === 'USER_PROMPT' || m.kind === 'AGENT_TO_USER');
+      } else if (messageCategoryFilter === 'AGENT') {
+        allMsgs = allMsgs.filter((m) => m.kind === 'TASK_DELEGATION' || m.kind === 'AGENT_MESSAGE');
+      }
+
+      // If onlyRunningAgents is switched ON (and not replaying), filter to visible agents or USER
+      if (onlyRunningAgents && replayStepIndex === null) {
+        const visibleIds = new Set(getVisibleAgentsForSession(session).map((a) => a.id));
+        visibleIds.add('USER');
+        allMsgs = allMsgs.filter((m) => visibleIds.has(m.sender.id) && visibleIds.has(m.recipient.id));
+      }
+
+      // Reverse order so NEWEST message is always at the TOP (en yeni üstte, eskiler aşağıda)
+      const newestFirstAllMsgs = [...allMsgs].reverse();
+
+      const catFilterButtonsHtml = `
+        <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-[11px] w-full justify-between">
+          <button onclick="setMessageCategoryFilter('ALL')" class="flex-1 py-1 rounded text-center ${
+            messageCategoryFilter === 'ALL' ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+          }">Tümü</button>
+          <button onclick="setMessageCategoryFilter('USER')" class="flex-1 py-1 rounded text-center ${
+            messageCategoryFilter === 'USER' ? 'bg-sky-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+          }">👤 Kullanıcı ↔ Ajan</button>
+          <button onclick="setMessageCategoryFilter('AGENT')" class="flex-1 py-1 rounded text-center ${
+            messageCategoryFilter === 'AGENT' ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
+          }">🤖 Ajan ↔ Ajan</button>
+        </div>
+      `;
+
+      if (graphSelectedNodeId) {
+        const agent =
+          graphSelectedNodeId === 'USER'
+            ? {
+                id: 'USER',
+                isRoot: false,
+                isUser: true,
+                role: '👤 Kullanıcı (User)',
+                typeName: 'user',
+                model: 'Human',
+                status: 'running',
+                workspace: 'Host Browser / CLI',
+                lastActionSummary: 'Kullanıcı istekleri ve yanıtları'
+              }
+            : agents.find((a) => a.id === graphSelectedNodeId) || agents[0];
+        const relatedMsgs = newestFirstAllMsgs.filter(
+          (m) => m.sender.id === agent.id || m.recipient.id === agent.id
+        );
+
+        headerEl.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              ${agent.isRoot ? '👑 Ana Orkestratör' : `🤖 ${escapeHtml(agent.typeName)}`}
+            </span>
+            <button onclick="graphSelectedNodeId=null; renderInteractiveGraph(getCurrentSession());" class="text-xs text-slate-400 hover:text-white">✕ Filtreyi Kaldır</button>
+          </div>
+          <h4 class="text-sm font-bold text-white">${escapeHtml(agent.role)}</h4>
+          <div class="flex flex-wrap items-center gap-1.5">
+            ${getModelBadgeHtml(agent.model)}
+            ${getStatusBadgeHtml(agent.status)}
+            <span class="mono text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800">
+              🌿 ${escapeHtml(agent.workspace)}
+            </span>
+          </div>
+          <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800">
+            <span class="text-[11px] text-slate-400 truncate">⚡ ${escapeHtml(agent.lastActionSummary)}</span>
+            <button
+              onclick="inspectAgentSteps('${agent.id}', event)"
+              class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium shrink-0 transition"
+            >
+              Adım & Thinking →
+            </button>
+          </div>
+          ${catFilterButtonsHtml}
+        `;
+
+        bodyEl.innerHTML =
+          relatedMsgs.length === 0
+            ? `<div class="text-xs text-slate-400 p-4 text-center">Bu ajana ait mesaj kaydı bulunmuyor.</div>`
+            : relatedMsgs.map((m) => formatCompactMessageCard(m, m._origIdx)).join('');
+        scrollActiveReplayMessage();
+        return;
+      }
+
+      if (graphSelectedEdgeKey) {
+        const [pair, kind] = graphSelectedEdgeKey.split(':');
+        const [fromId, toId] = pair.split('->');
+        const edgeMsgs = newestFirstAllMsgs.filter(
+          (m) => m.sender.id === fromId && m.recipient.id === toId && m.kind === kind
+        );
+
+        headerEl.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-300">🔗 Seçili Bağlantı Mesajları (${edgeMsgs.length})</span>
+            <button onclick="graphSelectedEdgeKey=null; renderInteractiveGraph(getCurrentSession());" class="text-xs text-slate-400 hover:text-white">✕ Kapat</button>
+          </div>
+          <p class="text-[11px] text-slate-400">En yeni mesaj üstte olacak şekilde sıralandı:</p>
+        `;
+        bodyEl.innerHTML = edgeMsgs.map((m) => formatCompactMessageCard(m, m._origIdx)).join('');
+        scrollActiveReplayMessage();
+        return;
+      }
+
+      // Default right-side message panel header (newest at top)
+      headerEl.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm">💬</span>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-white">Canlı Mesaj Trafiği (Yeni ➔ Eski)</h3>
+          </div>
+          <span class="mono text-[11px] px-2 py-0.5 rounded bg-slate-800 text-cyan-300">${newestFirstAllMsgs.length} mesaj</span>
+        </div>
+        ${
+          replayStepIndex !== null
+            ? `<div class="text-[11px] px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold animate-pulse">
+                ▶️ Canlandırma Adımı: ${Math.min(replayStepIndex + 1, rawMsgs.length)} / ${rawMsgs.length} (Yeni mesaj en üste düşer)
+              </div>`
+            : `<p class="text-[11px] text-slate-400">En yeni mesajlar en üstte listelenir. Graph'tan ajan seçerek filtreleyebilirsiniz.</p>`
+        }
+        ${catFilterButtonsHtml}
+      `;
+
+      bodyEl.innerHTML =
+        newestFirstAllMsgs.length === 0
+          ? `<div class="text-xs text-slate-400 p-6 text-center border border-slate-800 rounded-xl">Bu filtrede görüntülenecek mesaj bulunmuyor.</div>`
+          : newestFirstAllMsgs.map((m) => formatCompactMessageCard(m, m._origIdx)).join('');
+
+      scrollActiveReplayMessage();
+    }
+
+    function scrollActiveReplayMessage() {
+      if (replayStepIndex === null) return;
+      const bodyEl = document.getElementById('graphSideMessages');
+      if (bodyEl) {
+        bodyEl.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    function formatCompactMessageCard(m, idx) {
+      const meta = getMessageBadgeMeta(m);
+      const isCurrentReplayStep = replayStepIndex !== null && idx === replayStepIndex;
+      const highlightCls = isCurrentReplayStep
+        ? 'ring-2 ring-indigo-400 shadow-lg shadow-indigo-500/20'
+        : '';
+
+      const text = m.content || '';
+      const shortText = text.length > 550 ? text.slice(0, 550) + '...' : text;
+      const domId = `graph-msg-${idx}`;
+
+      return `
+        <div id="replay-card-${idx}" class="rounded-xl border p-3.5 ${meta.borderCls} ${highlightCls} text-xs space-y-2 transition">
+          <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="mono text-[10px] text-slate-400">#${idx + 1}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded ${meta.tagCls}">${meta.tag}</span>
+              <div class="flex items-center gap-1.5 text-xs font-semibold">
+                <span class="text-white px-2 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.sender.role)}</span>
+                <span class="text-slate-400 font-bold">➔</span>
+                <span class="text-cyan-300 px-2 py-0.5 rounded bg-slate-900 border border-slate-700">${escapeHtml(m.recipient.role)}</span>
+              </div>
+              ${m.kind === 'TASK_DELEGATION' ? getModelBadgeHtml(m.model) : ''}
+            </div>
+            <span class="mono text-[11px] text-slate-400">${formatTime(m.timestamp)}</span>
+          </div>
+          <pre id="${domId}" class="text-xs text-slate-100 whitespace-pre-wrap font-sans leading-relaxed overflow-x-auto">${escapeHtml(shortText)}</pre>
+          ${
+            text.length > 550
+              ? `<button
+                  onclick="toggleFullMessage('${domId}', this)"
+                  data-full="${escapeHtml(text)}"
+                  data-preview="${escapeHtml(shortText)}"
+                  data-expanded="false"
+                  class="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
+                >▼ Tamamını Göster (${text.length} karakter)</button>`
+              : ''
+          }
+        </div>
+      `;
+    }
+
+    function applyReplayStep(stepIdx) {
+      const s = getCurrentSession();
+      if (!s || !s.messages) return;
+      const msgs = s.messages;
+      const clamped = Math.max(0, Math.min(msgs.length, stepIdx));
+      replayStepIndex = clamped;
+
+      const scrubber = document.getElementById('replayScrubber');
+      if (scrubber) {
+        scrubber.max = String(msgs.length);
+        scrubber.value = String(clamped);
+      }
+
+      const badge = document.getElementById('replayStepBadge');
+      const text = document.getElementById('replayStepText');
+
+      if (clamped < msgs.length) {
+        const m = msgs[clamped];
+        replayHighlightEdgeKey = `${m.sender.id}->${m.recipient.id}:${m.kind}`;
+        let actionLabel = '📩 Mesaj';
+        if (m.kind === 'USER_PROMPT') actionLabel = '👤 Kullanıcı İsteği';
+        else if (m.kind === 'AGENT_TO_USER') actionLabel = '💬 Ajan Yanıtı';
+        else if (m.kind === 'TASK_DELEGATION') actionLabel = '🚀 Görev Başlatıldı';
+        else if (m.kind === 'AGENT_MESSAGE') actionLabel = '✅ Rapor Gönderildi (Ajan Kapanıyor)';
+        badge.textContent = `Adım ${clamped + 1}/${msgs.length}`;
+        text.textContent = `${actionLabel}: ${m.sender.role} ➔ ${m.recipient.role}`;
+      } else {
+        replayHighlightEdgeKey = null;
+        badge.textContent = `Bitti (${msgs.length}/${msgs.length})`;
+        text.textContent = `Tüm alt ajanlar görevlerini tamamlayıp kapandı.`;
+      }
+
+      renderInteractiveGraph(s);
+    }
+
+    function scheduleReplayTimer() {
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      if (replayPaused || replayStepIndex === null) return;
+      const intervalMs = Math.max(250, Math.round(1800 / replaySpeed));
+      replayTimer = setInterval(() => {
+        const s = getCurrentSession();
+        if (!s || !s.messages) return stopGraphReplay();
+        if (replayStepIndex >= s.messages.length) {
+          // Pause at the end so user can scrub back if desired
+          replayPaused = true;
+          updateReplayPlayPauseUI();
+          clearInterval(replayTimer);
+          replayTimer = null;
+          return;
+        }
+        applyReplayStep(replayStepIndex + 1);
+      }, intervalMs);
+    }
+
+    function updateReplayPlayPauseUI() {
+      const btn = document.getElementById('replayPlayPauseBtn');
+      if (!btn) return;
+      if (replayPaused) {
+        btn.textContent = '▶ Oynat';
+        btn.className = 'px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold min-w-[78px]';
+      } else {
+        btn.textContent = '⏸ Duraklat';
+        btn.className = 'px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold min-w-[78px]';
+      }
+    }
+
+    function toggleReplayPlayPause() {
+      const s = getCurrentSession();
+      if (!s || !s.messages) return;
+      if (replayStepIndex === null) {
+        return replayGraphMessages();
+      }
+      if (replayPaused && replayStepIndex >= s.messages.length) {
+        replayStepIndex = 0;
+      }
+      replayPaused = !replayPaused;
+      updateReplayPlayPauseUI();
+      if (replayPaused) {
+        if (replayTimer) {
+          clearInterval(replayTimer);
+          replayTimer = null;
+        }
+      } else {
+        applyReplayStep(replayStepIndex);
+        scheduleReplayTimer();
+      }
+    }
+
+    function stepReplayBy(delta) {
+      const s = getCurrentSession();
+      if (!s || !s.messages) return;
+      if (replayStepIndex === null) {
+        replayGraphMessages();
+      }
+      replayPaused = true;
+      updateReplayPlayPauseUI();
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      applyReplayStep((replayStepIndex ?? 0) + delta);
+    }
+
+    function onReplayScrub(val) {
+      const num = parseInt(val, 10) || 0;
+      replayPaused = true;
+      updateReplayPlayPauseUI();
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      applyReplayStep(num);
+    }
+
+    function setReplaySpeed(spd) {
+      replaySpeed = spd;
+      for (const sVal of [0.5, 1, 2, 4]) {
+        const b = document.getElementById(`speedBtn-${sVal}`);
+        if (b) {
+          b.className =
+            sVal === spd
+              ? 'text-[11px] mono px-2 py-0.5 rounded bg-indigo-600 text-white font-bold'
+              : 'text-[11px] mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white';
+        }
+      }
+      if (replayStepIndex !== null && !replayPaused) {
+        scheduleReplayTimer();
+      }
+    }
+
+    function replayGraphMessages() {
+      const s = getCurrentSession();
+      if (!s || !s.messages || s.messages.length === 0) return;
+
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      replayPaused = false;
+      updateReplayPlayPauseUI();
+
+      const banner = document.getElementById('replayBanner');
+      document.getElementById('replayBtnLabel').textContent = 'Canlandırılıyor...';
+      banner.classList.remove('hidden');
+
+      applyReplayStep(0);
+      scheduleReplayTimer();
+    }
+
+    function stopGraphReplay() {
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      replayStepIndex = null;
+      replayPaused = false;
+      replayHighlightEdgeKey = null;
+      const banner = document.getElementById('replayBanner');
+      if (banner) banner.classList.add('hidden');
+      const lbl = document.getElementById('replayBtnLabel');
+      if (lbl) lbl.textContent = 'Akışı Canlandır';
+      const s = getCurrentSession();
+      if (s && currentTab === 'graph') renderInteractiveGraph(s);
+    }
+
+    // =========================================================================
+    // TAB 1 & TAB 2 RENDERERS
+    // =========================================================================
+
+    function renderAgentNetwork(session) {
+      const grid = document.getElementById('agentNetworkGrid');
+      const agents = getVisibleAgentsForSession(session);
+
+      grid.innerHTML = agents
+        .map((a, idx) => {
+          const isSelected = selectedAgentFilterId === a.id;
+          const borderClass = a.isRoot
+            ? isSelected
+              ? 'border-indigo-400 bg-indigo-950/60 ring-2 ring-indigo-500/40'
+              : 'border-indigo-500/50 bg-indigo-950/25 hover:border-indigo-400'
+            : isSelected
+            ? 'border-cyan-400 bg-cyan-950/50 ring-2 ring-cyan-500/40'
+            : 'border-slate-700/80 bg-slate-900/90 hover:border-slate-500';
+
+          const runningClass = a.status === 'running' ? 'agent-running' : '';
+
+          return `
+            <div
+              onclick="selectAgentFilter('${a.id}')"
+              class="rounded-xl border p-3.5 transition cursor-pointer flex flex-col justify-between ${borderClass} ${runningClass}"
+            >
+              <div>
+                <div class="flex items-center justify-between gap-2 mb-2">
+                  <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                    a.isRoot ? 'bg-indigo-500 text-white' : 'bg-slate-800 text-cyan-300 border border-slate-700'
+                  }">
+                    ${a.isRoot ? '👑 ANA ORKESTRATÖR' : `🤖 ALT AJAN #${idx} (${escapeHtml(a.typeName)})`}
+                  </span>
+                  ${getStatusBadgeHtml(a.status)}
+                </div>
+
+                <h4 class="text-xs font-bold text-white leading-snug mb-1.5">${escapeHtml(a.role)}</h4>
+
+                <div class="flex flex-wrap items-center gap-1.5 mb-2">
+                  ${getModelBadgeHtml(a.model)}
+                  <span class="mono text-[10px] px-2 py-0.5 rounded bg-slate-800/90 text-slate-300 border border-slate-700 truncate max-w-[160px]" title="${escapeHtml(a.workspace)}">
+                    🌿 ${escapeHtml(a.workspace)}
+                  </span>
+                </div>
+              </div>
+
+              <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <div class="truncate max-w-[65%]" title="${escapeHtml(a.lastActionSummary)}">
+                  ⚡ ${escapeHtml(a.lastActionSummary)}
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <span class="mono text-[10px] text-slate-300">${a.stepCount} adım</span>
+                  <button
+                    onclick="inspectAgentSteps('${a.id}', event)"
+                    class="px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white text-[10px] font-medium border border-slate-700 transition"
+                  >
+                    İncele →
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function renderMessages(sessionObj) {
+      const s = sessionObj || getCurrentSession();
+      const stream = document.getElementById('messageStream');
+      if (!s) {
+        stream.innerHTML = '';
+        return;
+      }
+
+      const q = (document.getElementById('messageSearch').value || '').toLowerCase().trim();
+      const visibleIds = new Set(getVisibleAgentsForSession(s).map((a) => a.id));
+      visibleIds.add('USER');
+      let msgs = (s.messages || []).filter(
+        (m) => visibleIds.has(m.sender.id) && visibleIds.has(m.recipient.id)
+      );
+
+      if (selectedAgentFilterId) {
+        msgs = msgs.filter(
+          (m) => m.sender.id === selectedAgentFilterId || m.recipient.id === selectedAgentFilterId
+        );
+      }
+      if (q) {
+        msgs = msgs.filter(
+          (m) =>
+            (m.content || '').toLowerCase().includes(q) ||
+            (m.sender.role || '').toLowerCase().includes(q) ||
+            (m.recipient.role || '').toLowerCase().includes(q)
+        );
+      }
+
+      // Newest message first (en yeni mesaj en üstte)
+      msgs = [...msgs].reverse();
+
+      document.getElementById('messageCountLabel').textContent = `${msgs.length} mesaj`;
+
+      if (msgs.length === 0) {
+        stream.innerHTML = `
+          <div class="p-8 rounded-xl border border-slate-800 bg-slate-950/50 text-center space-y-2">
+            <div class="text-2xl">📭</div>
+            <div class="text-sm font-semibold text-slate-200">Bu oturumda görüntülenecek ajanlar arası mesaj bulunamadı.</div>
+          </div>
+        `;
+        return;
+      }
+
+      stream.innerHTML = msgs
+        .map((m, idx) => {
+          const meta = getMessageBadgeMeta(m);
+          const badgeHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded ${meta.tagCls}">${meta.tag}</span>`;
+          const cardBorder = meta.borderCls;
+          const isDelegation = m.kind === 'TASK_DELEGATION';
+
+          const contentText = m.content || '';
+          const isLong = contentText.length > 650;
+          const previewText = isLong ? contentText.slice(0, 650) + '...' : contentText;
+          const msgDomId = `msg-body-${idx}`;
+
+          return `
+            <div class="rounded-xl border p-4 ${cardBorder} transition">
+              <div class="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-800/80">
+                <div class="flex flex-wrap items-center gap-2">
+                  ${badgeHtml}
+                  <div class="flex items-center gap-1.5 text-xs">
+                    <span class="font-semibold text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
+                      ${escapeHtml(m.sender.role)}
+                    </span>
+                    <span class="text-slate-400 font-bold">➔</span>
+                    <span class="font-semibold text-cyan-300 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
+                      ${escapeHtml(m.recipient.role)}
+                    </span>
+                  </div>
+                  ${isDelegation ? getModelBadgeHtml(m.model) : ''}
+                </div>
+                <span class="mono text-[11px] text-slate-400">${formatTime(m.timestamp)}</span>
+              </div>
+
+              <pre id="${msgDomId}" class="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed font-sans overflow-x-auto">${escapeHtml(previewText)}</pre>
+              ${
+                isLong
+                  ? `<button
+                      onclick="toggleFullMessage('${msgDomId}', this)"
+                      data-full="${escapeHtml(contentText)}"
+                      data-preview="${escapeHtml(previewText)}"
+                      data-expanded="false"
+                      class="mt-2 text-[11px] font-semibold text-indigo-400 hover:text-indigo-300"
+                    >
+                      ▼ Tamamını Göster (${contentText.length} karakter)
+                    </button>`
+                  : ''
+              }
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    function toggleFullMessage(domId, btn) {
+      const pre = document.getElementById(domId);
+      const expanded = btn.getAttribute('data-expanded') === 'true';
+      if (expanded) {
+        pre.textContent = btn.getAttribute('data-preview');
+        btn.setAttribute('data-expanded', 'false');
+        btn.textContent = '▼ Tamamını Göster';
+      } else {
+        pre.textContent = btn.getAttribute('data-full');
+        btn.setAttribute('data-expanded', 'true');
+        btn.textContent = '▲ Daralt';
+      }
+    }
+
+    async function renderInspectorTab() {
+      const s = getCurrentSession();
+      if (!s) return;
+
+      const agents = s.agents || [];
+      if (!inspectorAgentId || !agents.some((a) => a.id === inspectorAgentId)) {
+        inspectorAgentId = agents[0]?.id || s.id;
+      }
+
+      const listEl = document.getElementById('inspectorAgentList');
+      listEl.innerHTML = agents
+        .map((a, idx) => {
+          const active = a.id === inspectorAgentId;
+          return `
+            <div
+              onclick="inspectorAgentId='${a.id}'; renderInspectorTab();"
+              class="p-3 rounded-lg border cursor-pointer transition ${
+                active
+                  ? 'bg-indigo-950/60 border-indigo-500 text-white'
+                  : 'bg-slate-900/70 border-slate-800 text-slate-300 hover:bg-slate-900'
+              }"
+            >
+              <div class="flex items-center justify-between text-[10px] mb-1">
+                <span class="font-bold uppercase text-indigo-300">${a.isRoot ? '👑 Ana Ajan' : `🤖 Alt Ajan #${idx}`}</span>
+                <span class="mono">${a.stepCount} adım</span>
+              </div>
+              <div class="text-xs font-semibold truncate mb-1.5">${escapeHtml(a.role)}</div>
+              <div class="flex items-center justify-between">
+                ${getModelBadgeHtml(a.model)}
+                ${getStatusBadgeHtml(a.status)}
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+
+      const activeAgent = agents.find((a) => a.id === inspectorAgentId) || agents[0];
+      const headerEl = document.getElementById('inspectorHeader');
+      headerEl.innerHTML = `
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="text-sm font-bold text-white">${escapeHtml(activeAgent.role)}</h3>
+            ${getModelBadgeHtml(activeAgent.model)}
+            ${getStatusBadgeHtml(activeAgent.status)}
+          </div>
+          <p class="text-[11px] mono text-slate-400 mt-0.5">Conversation ID: ${activeAgent.id} | Workspace: ${escapeHtml(activeAgent.workspace)}</p>
+        </div>
+      `;
+
+      const stepsEl = document.getElementById('inspectorSteps');
+      try {
+        const res = await fetch(`/api/agent/${inspectorAgentId}`);
+        const detail = await res.json();
+        const steps = detail.steps || [];
+
+        stepsEl.innerHTML = steps
+          .map((st) => {
+            let typeBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">${escapeHtml(st.type)}</span>`;
+            if (st.type === 'USER_INPUT') {
+              typeBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">👤 KULLANICI İSTEĞİ</span>`;
+            } else if (st.type === 'PLANNER_RESPONSE') {
+              typeBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">🧠 AJAN YANITI / KARARI</span>`;
+            } else if (st.type === 'SYSTEM_MESSAGE') {
+              typeBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">📨 GELEN SİSTEM/AJAN MESAJI</span>`;
+            } else if (st.type === 'GENERIC') {
+              typeBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">⚙️ ARAÇ ÇIKTISI</span>`;
+            }
+
+            const thinkingHtml = st.thinking
+              ? `<details class="mt-2 rounded-lg bg-amber-950/20 border border-amber-500/30 p-2.5">
+                  <summary class="text-xs font-semibold text-amber-300 cursor-pointer">💭 İçsel Düşünce (Thinking) Sürecini Göster</summary>
+                  <pre class="mt-2 text-xs text-amber-100/90 whitespace-pre-wrap font-sans">${escapeHtml(st.thinking)}</pre>
+                </details>`
+              : '';
+
+            const toolsHtml =
+              st.toolCalls && st.toolCalls.length > 0
+                ? `<div class="mt-2 space-y-1.5">
+                    ${st.toolCalls
+                      .map(
+                        (tc) => `
+                        <div class="rounded-lg bg-slate-950 border border-slate-800 p-2.5">
+                          <div class="text-xs font-semibold text-cyan-300 mono mb-1">🛠️ ${escapeHtml(tc.name)}</div>
+                          <pre class="text-[11px] text-slate-300 mono whitespace-pre-wrap overflow-x-auto max-h-48">${escapeHtml(
+                            JSON.stringify(tc.args, null, 2)
+                          )}</pre>
+                        </div>`
+                      )
+                      .join('')}
+                  </div>`
+                : '';
+
+            const bodyText = st.content || '';
+            const clippedBody = bodyText.length > 1200 ? bodyText.slice(0, 1200) + '\n... [Kısaltıldı]' : bodyText;
+
+            return `
+              <div class="rounded-xl border border-slate-800/90 bg-slate-900/60 p-3.5">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="flex items-center gap-2">
+                    <span class="mono text-[10px] text-slate-500">#${st.stepIndex}</span>
+                    ${typeBadge}
+                  </div>
+                  <span class="mono text-[10px] text-slate-400">${formatTime(st.createdAt)}</span>
+                </div>
+                ${thinkingHtml}
+                ${
+                  clippedBody
+                    ? `<pre class="mt-2 text-xs text-slate-200 whitespace-pre-wrap font-sans overflow-x-auto">${escapeHtml(clippedBody)}</pre>`
+                    : ''
+                }
+                ${toolsHtml}
+              </div>
+            `;
+          })
+          .join('');
+      } catch (e) {
+        stepsEl.innerHTML = `<div class="text-xs text-rose-400">Ajan adımları yüklenemedi.</div>`;
+      }
+    }
+
+    function openProfilesModal() {
+      const modal = document.getElementById('profilesModal');
+      const body = document.getElementById('profilesModalBody');
+      const profiles = (worldState && worldState.agentProfiles) || [];
+
+      body.innerHTML = profiles
+        .map(
+          (p) => `
+          <div class="rounded-xl border border-slate-800 bg-slate-950/80 p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="mono text-xs font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-0.5 rounded">
+                  🤖 ${escapeHtml(p.name)}
+                </span>
+                ${getModelBadgeHtml(p.model)}
+              </div>
+              <p class="text-xs text-slate-300 mb-3">${escapeHtml(p.description)}</p>
+            </div>
+            <details class="text-xs border-t border-slate-800 pt-2">
+              <summary class="cursor-pointer text-indigo-400 hover:text-indigo-300 font-medium">Sistem Promptunu Gör</summary>
+              <pre class="mt-2 text-[11px] text-slate-400 whitespace-pre-wrap max-h-40 overflow-y-auto">${escapeHtml(p.systemPrompt)}</pre>
+            </details>
+          </div>
+        `
+        )
+        .join('');
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeProfilesModal() {
+      document.getElementById('profilesModal').classList.add('hidden');
+    }
+
+    window.addEventListener('resize', () => {
+      const s = getCurrentSession();
+      if (s && currentTab === 'graph') renderInteractiveGraph(s);
+    });
+
+    // Initial load & 2.5s live polling
+    fetchWorldState();
+    setInterval(fetchWorldState, 2500);
+  </script>
+</body>
+</html>
