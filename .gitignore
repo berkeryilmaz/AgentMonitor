@@ -1,5 +1,53 @@
+# Node.js dependencies
 node_modules/
-data/
-.DS_Store
-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and sensitive files
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Data & transcripts (keep directory structure with .gitkeep)
+data/*
+!data/.gitkeep
+
+# Python artifacts (for sync_from_agy.py)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Logs & temporary files
+*.log
+logs/
+temp/
+tmp/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor configurations
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
